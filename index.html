@@ -177,6 +177,13 @@
             margin-bottom: 12px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.02);
         }
+        .day-header.unscheduled-banner {
+            border: 1px solid var(--accent);
+            border-left: 5px solid var(--accent);
+        }
+        .day-header.unscheduled-banner h2 { color: var(--accent); }
+        .day-btn.unscheduled-day { border-style: dashed; }
+
         .scene-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; gap: 8px; }
         .scene-num { font-weight: bold; font-size: 17px; color: var(--primary); }
         .scene-set { font-size: 14px; font-weight: 700; color: var(--text-main); margin-bottom: 6px; }
@@ -231,6 +238,11 @@
             line-height: 1.4;
             word-break: break-word;
         }
+
+        .prop-group + .prop-group { margin-top: 10px; }
+        .prop-group-name { display: block; margin-bottom: 5px; font-weight: 700; }
+        .prop-group-items { margin: 0; padding-left: 20px; }
+        .prop-group-items li + li { margin-top: 4px; }
 
         .admin-notes-box {
             background: #f1f5f9;
@@ -469,9 +481,8 @@
 
         <button id="saveGlobalBtn" class="save-btn hidden" onclick="saveChanges()">💾 Salva tutte le modifiche</button>
 
-        <div class="view-tabs">
-            <button type="button" class="view-tab-btn" data-view="days" onclick="setViewMode('days')">📅 Giorni</button>
-            <button type="button" class="view-tab-btn" data-view="shopping" onclick="setViewMode('shopping')">🛒 Da comprare<span id="shoppingBadge" class="count-badge hidden"></span></button>
+        <div id="adminViewControls" class="view-tabs hidden">
+            <button id="reviewPropsBtn" type="button" class="view-tab-btn" data-view="shopping" aria-pressed="false" aria-controls="mainContent" onclick="setViewMode(viewMode === 'shopping' ? 'days' : 'shopping')">📋 Da controllare<span id="shoppingBadge" class="count-badge hidden"></span></button>
         </div>
 
         <div class="search-wrapper">
@@ -519,6 +530,13 @@
     }
 
     const THEME_KEY = 'upgraded_props_theme';
+    const UNSCHEDULED_DAY = 'Da programmare';
+
+    function getAvailableDays() {
+        const days = [...new Set(dbScenes.map(s => s.data))];
+        return days.filter(day => day !== UNSCHEDULED_DAY)
+            .concat(days.includes(UNSCHEDULED_DAY) ? [UNSCHEDULED_DAY] : []);
+    }
 
     function escapeHtml(str) {
         if (str === null || str === undefined) return '';
@@ -617,7 +635,7 @@
             showToast('⚠️ Impossibile caricare i dati dal server.', true);
             dbScenes = [];
         }
-        const availableDays = [...new Set(dbScenes.map(s => s.data))];
+        const availableDays = getAvailableDays();
         if (availableDays.length > 0 && !availableDays.includes(currentDay)) {
             currentDay = availableDays[0];
         }
@@ -645,7 +663,7 @@
 
     function setViewMode(mode) {
         syncInputsToDb();
-        viewMode = mode;
+        viewMode = isAdmin && mode === 'shopping' ? 'shopping' : 'days';
         renderApp();
     }
 
@@ -679,21 +697,23 @@
         autosizeAll();
     }
     function renderAppCore() {
+        if (!isAdmin) viewMode = 'days';
+        document.getElementById('adminViewControls').classList.toggle('hidden', !isAdmin);
         document.querySelectorAll('.view-tab-btn').forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.view === viewMode);
+            const active = btn.dataset.view === viewMode;
+            btn.classList.toggle('active', active);
+            btn.setAttribute('aria-pressed', String(active));
         });
         const pending = countPendingProps();
         const badge = document.getElementById('shoppingBadge');
         badge.textContent = pending > 0 ? pending : '';
         badge.classList.toggle('hidden', pending === 0);
 
-        document.getElementById('daysScrollWrapper').classList.toggle('hidden', viewMode === 'shopping');
-
-        const availableDays = [...new Set(dbScenes.map(s => s.data))];
+        const availableDays = getAvailableDays();
         let daysHTML = '';
         availableDays.forEach(d => {
             const active = (viewMode === 'days' && !searchQuery && currentDay === d) ? 'active' : '';
-            daysHTML += `<div class="day-btn ${active}" data-day="${escapeHtml(d)}" onclick="setDay(this.dataset.day)">
+            daysHTML += `<div class="day-btn ${active} ${d === UNSCHEDULED_DAY ? 'unscheduled-day' : ''}" data-day="${escapeHtml(d)}" onclick="setDay(this.dataset.day)">
                 <span class="label">${escapeHtml(d)}</span>
             </div>`;
         });
@@ -719,11 +739,11 @@
             const castSet = new Set();
             filtered.forEach(s => (s.cast || '').split(',').map(c => c.trim()).filter(Boolean).forEach(c => castSet.add(c)));
             const pendingInDay = filtered.reduce((n, s) => n + (s.props || []).filter(p => p.status === 'red' || p.status === 'yellow').length, 0);
-            headerSubtitle = `${filtered.length} scene · ${castSet.size} attori coinvolti` + (pendingInDay > 0 ? ` · 🛒 ${pendingInDay} props da preparare` : '');
+            headerSubtitle = `${filtered.length} scene · ${castSet.size} attori coinvolti` + (isAdmin && pendingInDay > 0 ? ` · 📋 ${pendingInDay} props da controllare` : '');
         }
 
         let html = `
-            <div class="day-header">
+            <div class="day-header ${!searchQuery && currentDay === UNSCHEDULED_DAY ? 'unscheduled-banner' : ''}">
                 <div>
                     <h2>${headerTitle}</h2>
                     ${headerSubtitle ? `<div class="day-summary">${headerSubtitle}</div>` : ''}
@@ -749,11 +769,31 @@
         return html;
     }
 
+    function renderGroupedProps(props) {
+        const groups = new Map();
+        props.forEach(p => {
+            const text = String(p.text || '').trim();
+            const separator = text.indexOf(':');
+            const hasCharacter = separator > 0 && text.slice(separator + 1).trim();
+            const character = hasCharacter ? text.slice(0, separator).trim() : '';
+            const name = hasCharacter ? text.slice(separator + 1).trim() : text;
+            const key = character.toLocaleLowerCase().replace(/\s*,\s*/g, ',').replace(/\s+/g, ' ');
+            if (!groups.has(key)) groups.set(key, { character, items: [] });
+            groups.get(key).items.push(name);
+        });
+        return [...groups.values()].map(group => `
+            <div class="prop-group prop-item-public">
+                ${group.character ? `<strong class="prop-group-name">${escapeHtml(group.character)}</strong>` : ''}
+                <ul class="prop-group-items">${group.items.map(name => `<li>${escapeHtml(name)}</li>`).join('')}</ul>
+            </div>
+        `).join('');
+    }
+
     function renderSceneCard(s, showDateBadge) {
         const propsList = s.props || [];
         let publicPropsHTML = "";
         if (propsList.length > 0) {
-            const itemsList = propsList.map(p => `<div class="prop-item-public">• ${escapeHtml(p.text)}</div>`).join("");
+            const itemsList = renderGroupedProps(propsList);
             publicPropsHTML = `
                 <div class="props-section">
                     <span class="props-label">📦 Props</span>
@@ -864,7 +904,7 @@
 
                     <div class="edit-row wrap" style="margin-top: 4px; align-items: flex-end;">
                         <div class="edit-group full">
-                            <label>🔒 Note Interne Scena (visibili solo in Admin Mode)</label>
+                            <label>🔒 Note Interne Scena</label>
                             <textarea class="input-adminnotes autogrow single" rows="1" data-id="${s.id}" placeholder="Note generali di scena...">${escapeHtml(s.adminNotes || '')}</textarea>
                         </div>
                         <div style="display: flex; gap: 6px; margin-bottom: 2px; flex: 1 1 100%; justify-content: flex-end;">
@@ -879,6 +919,7 @@
     }
 
     function renderShoppingListHTML() {
+        if (!isAdmin) return '';
         let items = [];
         dbScenes.forEach(s => {
             (s.props || []).forEach(p => {
@@ -895,14 +936,14 @@
         let html = `
             <div class="day-header">
                 <div>
-                    <h2>🛒 Lista Acquisti</h2>
-                    <div class="day-summary">${items.length} props da preparare in totale</div>
+                    <h2>📋 Da controllare</h2>
+                    <div class="day-summary">${items.length} props ${searchQuery ? 'trovati' : 'da controllare'}. Scegli una data per tornare alle scene.</div>
                 </div>
             </div>
         `;
 
         if (items.length === 0) {
-            html += `<p class="empty-state" style="text-align:center; color:var(--text-muted);">Tutti i props sono pronti! 🎉</p>`;
+            html += `<p class="empty-state" style="text-align:center; color:var(--text-muted);">${searchQuery ? 'Nessun prop da controllare corrisponde alla ricerca.' : 'Tutti i props sono pronti! 🎉'}</p>`;
             return html;
         }
 
@@ -1156,7 +1197,7 @@
         dataVersion = version;
         dbScenes = saved.map(s => ({ ...s, props: parseProps(s.props) }));
         expandedScenes = new Set();
-        const availableDays = [...new Set(dbScenes.map(s => s.data))];
+        const availableDays = getAvailableDays();
         if (availableDays.length > 0 && !availableDays.includes(currentDay)) currentDay = availableDays[0];
         clearDirty();
     }
@@ -1190,7 +1231,7 @@
                 if (!confirm(`Importare ${nextScenes.length} scene? Sostituirà TUTTI i dati attuali sul server.`)) return;
                 const saved = await sendScenes(nextScenes, { allowEmpty: false, force: true });
                 applySaved(saved.scenes, saved.version);
-                const availableDays = [...new Set(dbScenes.map(s => s.data))];
+                const availableDays = getAvailableDays();
                 currentDay = availableDays[0] || "";
                 renderApp();
                 showToast("✅ Backup importato e pubblicato.");
