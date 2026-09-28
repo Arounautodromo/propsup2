@@ -276,6 +276,13 @@
             border-radius: 8px;
         }
         .edit-row { display: flex; gap: 8px; }
+        .edit-row.wrap { flex-wrap: wrap; }
+        .edit-group textarea.autogrow, .admin-prop-item textarea.autogrow {
+            resize: none; overflow: hidden; min-height: 38px; line-height: 1.35;
+        }
+        .edit-group textarea.input-sinossi { min-height: 70px; }
+        .admin-prop-row { flex-wrap: wrap; }
+        .admin-prop-row .prop-text-input { flex: 1 1 100%; font-size: 14px; }
         .edit-group { display: flex; flex-direction: column; gap: 2px; flex: 1; }
         .edit-group.full { width: 100%; }
         .edit-group label { font-size: 11px; font-weight: bold; color: var(--primary); text-transform: uppercase; }
@@ -392,6 +399,7 @@
         .toast.error { background: #991b1b; }
 
         @media (min-width: 720px) {
+            #mainContent .scene-card:has(.edit-container:not(.hidden)) { grid-column: 1 / -1; }
             .container { max-width: 960px; }
             #mainContent {
                 display: grid;
@@ -657,7 +665,20 @@
         renderApp();
     }
 
+    function autosize(el) {
+        el.style.height = 'auto';
+        el.style.height = (el.scrollHeight + 2) + 'px';
+    }
+    function autosizeAll() {
+        document.querySelectorAll('#mainContent textarea.autogrow').forEach(el => {
+            if (el.offsetParent !== null) autosize(el);
+        });
+    }
     function renderApp() {
+        renderAppCore();
+        autosizeAll();
+    }
+    function renderAppCore() {
         document.querySelectorAll('.view-tab-btn').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.view === viewMode);
         });
@@ -754,8 +775,8 @@
                 return `
                     <div class="admin-prop-item" data-prop-index="${pIdx}">
                         <div class="admin-prop-row">
-                            <input type="text" class="prop-text-input" value="${escapeHtml(p.text)}" placeholder="Nome prop (es. Antonio: ...)" style="flex: 1;">
-                            <select class="prop-status-input" style="width: 110px;">
+                            <textarea class="prop-text-input autogrow single" rows="1" placeholder="Nome prop (es. Antonio: ...)">${escapeHtml(p.text)}</textarea>
+                            <select class="prop-status-input" style="flex: 1; min-width: 130px;">
                                 <option value="red" ${rSel}>🔴 Da comprare</option>
                                 <option value="yellow" ${ySel}>🟡 Comprato</option>
                                 <option value="green" ${gSel}>🟢 Sul camion</option>
@@ -764,7 +785,7 @@
                             <button type="button" onclick="removeProp(${s.id}, ${pIdx})" style="background:#fee2e2; color:#991b1b; border:none; border-radius:6px; padding:7px 10px; font-weight:bold;" title="Rimuovi prop">✕</button>
                         </div>
                         <div class="prop-note-inline" style="${noteContainerStyle}">
-                            <textarea class="prop-note-input" placeholder="Nota specifica per questo prop..." style="height: 38px; font-size: 12px;">${escapeHtml(p.note || '')}</textarea>
+                            <textarea class="prop-note-input autogrow" placeholder="Nota specifica per questo prop..." style="font-size: 13px;">${escapeHtml(p.note || '')}</textarea>
                         </div>
                     </div>
                 `;
@@ -802,7 +823,7 @@
                 ` : ''}
 
                 <div class="edit-container ${isAdmin && expanded ? '' : 'hidden'}">
-                    <div class="edit-row">
+                    <div class="edit-row wrap">
                         <div class="edit-group" style="flex: 0 0 75px;">
                             <label>Scena</label>
                             <input type="text" class="input-scena" data-id="${s.id}" value="${escapeHtml(s.scena || '')}">
@@ -811,23 +832,23 @@
                             <label>Data</label>
                             <input type="text" class="input-data" data-id="${s.id}" value="${escapeHtml(s.data || '')}" placeholder="Es: 19 Ott">
                         </div>
-                        <div class="edit-group">
+                        <div class="edit-group" style="flex: 1 1 100%; order: 3;">
                             <label>Set</label>
-                            <input type="text" class="input-set" data-id="${s.id}" value="${escapeHtml(s.set || '')}">
+                            <textarea class="input-set autogrow single" rows="1" data-id="${s.id}">${escapeHtml(s.set || '')}</textarea>
                         </div>
                     </div>
                     <div class="edit-group full">
                         <label>Sinossi</label>
-                        <textarea class="input-sinossi" data-id="${s.id}">${escapeHtml(s.sinossi || '')}</textarea>
+                        <textarea class="input-sinossi autogrow" data-id="${s.id}">${escapeHtml(s.sinossi || '')}</textarea>
                     </div>
-                    <div class="edit-row">
-                        <div class="edit-group">
+                    <div class="edit-row wrap">
+                        <div class="edit-group" style="min-width: 220px;">
                             <label>🎭 Cast</label>
-                            <input type="text" class="input-cast" data-id="${s.id}" value="${escapeHtml(s.cast || '')}" placeholder="Attori...">
+                            <textarea class="input-cast autogrow single" rows="1" data-id="${s.id}" placeholder="Attori...">${escapeHtml(s.cast || '')}</textarea>
                         </div>
-                        <div class="edit-group">
+                        <div class="edit-group" style="min-width: 220px;">
                             <label>👥 Extras</label>
-                            <input type="text" class="input-extras" data-id="${s.id}" value="${escapeHtml(s.extras || '')}" placeholder="Extras...">
+                            <textarea class="input-extras autogrow single" rows="1" data-id="${s.id}" placeholder="Extras...">${escapeHtml(s.extras || '')}</textarea>
                         </div>
                     </div>
 
@@ -841,12 +862,12 @@
                         </div>
                     </div>
 
-                    <div class="edit-row" style="margin-top: 4px; align-items: flex-end;">
+                    <div class="edit-row wrap" style="margin-top: 4px; align-items: flex-end;">
                         <div class="edit-group full">
-                            <label>🔒 Note Interne Scena (Nascoste ai collaboratori)</label>
-                            <input type="text" class="input-adminnotes" data-id="${s.id}" value="${escapeHtml(s.adminNotes || '')}" placeholder="Note generali di scena...">
+                            <label>🔒 Note Interne Scena (visibili solo in Admin Mode)</label>
+                            <textarea class="input-adminnotes autogrow single" rows="1" data-id="${s.id}" placeholder="Note generali di scena...">${escapeHtml(s.adminNotes || '')}</textarea>
                         </div>
-                        <div style="display: flex; gap: 4px; margin-bottom: 2px;">
+                        <div style="display: flex; gap: 6px; margin-bottom: 2px; flex: 1 1 100%; justify-content: flex-end;">
                             <button onclick="moveScene(${s.id}, -1)" title="Sposta su" style="background:#e2e8f0; font-weight:bold; padding:8px 10px;">⬆️</button>
                             <button onclick="moveScene(${s.id}, 1)" title="Sposta giù" style="background:#e2e8f0; font-weight:bold; padding:8px 10px;">⬇️</button>
                             <button onclick="deleteScene(${s.id})" style="background:#fee2e2; color:#991b1b; border:none; border-radius:6px; padding:8px 12px; font-weight:bold;" title="Elimina scena">🗑️</button>
@@ -965,6 +986,7 @@
                 const noteBtn = targetItem.querySelector('.note-symbol-btn');
                 if (noteInline.style.display === 'none' || noteInline.style.display === '') {
                     noteInline.style.display = 'block';
+                    autosizeAll();
                 } else {
                     noteInline.style.display = 'none';
                     const noteInput = targetItem.querySelector('.prop-note-input');
@@ -1180,6 +1202,12 @@
         event.target.value = "";
     }
 
+    document.getElementById('mainContent').addEventListener('input', e => {
+        if (e.target.classList && e.target.classList.contains('autogrow')) autosize(e.target);
+    });
+    document.getElementById('mainContent').addEventListener('keydown', e => {
+        if (e.key === 'Enter' && e.target.classList && e.target.classList.contains('single')) e.preventDefault();
+    });
     function onEditorChange(e) {
         if (isAdmin && e.target.closest && e.target.closest('.edit-container')) markDirty();
     }
