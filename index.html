@@ -1,0 +1,1194 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upgraded 2 PROPS - Cast & Admin</title>
+    <style>
+        :root {
+            --bg-color: #f4f6f9;
+            --card-bg: #ffffff;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --primary: #1e3a8a;
+            --primary-light: #dbeafe;
+            --border: #e2e8f0;
+            --accent: #d97706;
+            --accent-light: #fef3c7;
+            --success: #16a34a;
+            --cast-color: #1d4ed8;
+            --cast-light: #eff6ff;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 16px;
+            display: flex;
+            justify-content: center;
+            transition: background-color 0.2s, color 0.2s;
+        }
+        .container {
+            width: 100%;
+            max-width: 480px;
+            background: var(--card-bg);
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            padding: 16px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            min-height: 90vh;
+            position: relative;
+        }
+        .app-content {
+            flex: 1;
+        }
+        .header-top {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        h1 {
+            font-size: 22px;
+            margin: 0;
+            color: var(--primary);
+            text-align: center;
+        }
+        button {
+            background: #e2e8f0;
+            border: none;
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        button:disabled { opacity: 0.6; cursor: default; }
+        button.active-admin {
+            background: var(--primary);
+            color: white;
+        }
+        button.save-btn {
+            background: var(--success);
+            color: white;
+            width: 100%;
+            padding: 12px;
+            font-size: 15px;
+            margin-bottom: 12px;
+            border-radius: 10px;
+        }
+        .theme-toggle-btn {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            background: transparent;
+            border: none;
+            font-size: 18px;
+            padding: 4px 8px;
+        }
+        .view-tabs { display: flex; gap: 8px; margin-bottom: 12px; }
+        .view-tab-btn {
+            flex: 1;
+            background: #f1f5f9;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 10px;
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text-muted);
+        }
+        .view-tab-btn.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+        .count-badge {
+            background: #dc2626;
+            color: white;
+            border-radius: 999px;
+            padding: 1px 7px;
+            font-size: 11px;
+            margin-left: 6px;
+        }
+        .count-badge.hidden { display: none; }
+        .search-wrapper { margin-bottom: 12px; }
+        #searchInput {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 10px 12px;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            font-size: 14px;
+            background: var(--card-bg);
+            color: var(--text-main);
+            font-family: inherit;
+        }
+        .days-scroll-wrapper {
+            width: 100%;
+            overflow-x: auto;
+            white-space: nowrap;
+            margin-bottom: 16px;
+            padding-bottom: 6px;
+            -webkit-overflow-scrolling: touch;
+        }
+        .days-scroll-wrapper::-webkit-scrollbar { height: 6px; }
+        .days-scroll-wrapper::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        .days-scroll { display: inline-flex; gap: 8px; }
+        .day-btn {
+            background: #f1f5f9;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 10px 14px;
+            text-align: center;
+            cursor: pointer;
+            flex-shrink: 0;
+            min-width: 65px;
+        }
+        .day-btn.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+        .day-btn .label { font-weight: bold; font-size: 15px; display: block; }
+
+        .day-header {
+            background: #f8fafc;
+            border-radius: 10px;
+            padding: 12px 14px;
+            margin-bottom: 14px;
+            border: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+        }
+        .day-header h2 { margin: 0; font-size: 19px; color: var(--primary); }
+        .day-summary { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+        .scene-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 14px;
+            margin-bottom: 12px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        }
+        .scene-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; gap: 8px; }
+        .scene-num { font-weight: bold; font-size: 17px; color: var(--primary); }
+        .scene-set { font-size: 14px; font-weight: 700; color: var(--text-main); margin-bottom: 6px; }
+        .scene-synopsis { font-size: 14px; color: #334155; margin-bottom: 10px; line-height: 1.4; }
+
+        .edit-toggle-btn {
+            background: #eef2ff;
+            color: var(--primary);
+            border: 1px solid var(--primary-light);
+            border-radius: 8px;
+            padding: 5px 10px;
+            font-size: 12px;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+
+        .badges-top { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+        .badge {
+            font-size: 12px;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-weight: 500;
+        }
+        .badge.cast { background: var(--cast-light); color: var(--cast-color); border: 1px solid #bfdbfe; font-weight: 600; }
+        .badge.extra { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
+        .badge.date { background: var(--primary-light); color: var(--primary); border: 1px solid var(--border); white-space: nowrap; }
+
+        .props-section {
+            background: var(--accent-light);
+            border: 1px solid #fde68a;
+            border-radius: 8px;
+            padding: 10px 12px;
+            margin-top: 8px;
+        }
+        .props-label {
+            font-size: 11px;
+            font-weight: bold;
+            color: var(--accent);
+            text-transform: uppercase;
+            margin-bottom: 4px;
+            display: block;
+        }
+        .props-list {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .prop-item-public {
+            font-size: 13px;
+            color: #92400e;
+            font-weight: 500;
+            line-height: 1.4;
+            word-break: break-word;
+        }
+
+        .admin-notes-box {
+            background: #f1f5f9;
+            border-left: 3px solid var(--primary);
+            padding: 8px 10px;
+            margin-top: 8px;
+            border-radius: 0 6px 6px 0;
+            font-size: 12px;
+            color: #334155;
+        }
+        .admin-notes-title {
+            font-weight: bold;
+            color: var(--primary);
+            font-size: 10px;
+            text-transform: uppercase;
+            margin-bottom: 2px;
+            display: block;
+        }
+
+        .milestone-card {
+            background: linear-gradient(135deg, #1e3a8a, #3b82f6);
+            color: white;
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 15px;
+            letter-spacing: 0.5px;
+            margin-top: 20px;
+            margin-bottom: 12px;
+            box-shadow: 0 4px 12px rgba(30, 58, 138, 0.2);
+        }
+
+        .edit-container {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px dashed var(--border);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            background: #fafaf9;
+            padding: 10px;
+            border-radius: 8px;
+        }
+        .edit-row { display: flex; gap: 8px; }
+        .edit-group { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+        .edit-group.full { width: 100%; }
+        .edit-group label { font-size: 11px; font-weight: bold; color: var(--primary); text-transform: uppercase; }
+        .edit-group input, .edit-group textarea, .edit-group select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 13px;
+            box-sizing: border-box;
+            background: #ffffff;
+            font-family: inherit;
+        }
+        .edit-group textarea { resize: vertical; height: 45px; }
+
+        .props-manager {
+            background: var(--card-bg);
+            padding: 8px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            margin-top: 4px;
+        }
+        .admin-prop-item input, .admin-prop-item select, .admin-prop-item textarea {
+            padding: 8px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 13px;
+            font-family: inherit;
+            box-sizing: border-box;
+            background: var(--card-bg);
+            color: var(--text-main);
+        }
+        .admin-prop-item textarea { width: 100%; resize: vertical; }
+        button.save-btn.dirty { background: #d97706; }
+        .admin-prop-item {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 8px;
+            margin-bottom: 6px;
+        }
+        .admin-prop-row {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+        .note-symbol-btn {
+            background: #f1f5f9;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 7px 10px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .note-symbol-btn.has-note {
+            background: var(--accent-light);
+            border-color: var(--accent);
+        }
+        .prop-note-inline {
+            margin-top: 6px;
+            padding-top: 6px;
+            border-top: 1px dashed var(--border);
+        }
+
+        .shopping-group-header {
+            font-size: 13px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            color: var(--text-muted);
+            margin: 14px 0 8px;
+        }
+        .shopping-item { cursor: pointer; }
+        .shopping-item:hover { box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+
+        .admin-footer {
+            margin-top: auto;
+            padding-top: 20px;
+            border-top: 1px solid var(--border);
+            text-align: center;
+        }
+        .admin-toggle-link {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 12px;
+            cursor: pointer;
+            padding: 6px 10px;
+        }
+        .admin-toggle-link:hover { color: var(--primary); }
+        .hidden { display: none !important; }
+
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translate(-50%, 20px);
+            background: #1e293b;
+            color: #fff;
+            padding: 12px 18px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.25s ease;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+            z-index: 1000;
+            max-width: 90vw;
+            text-align: center;
+        }
+        .toast.show { opacity: 1; transform: translate(-50%, 0); }
+        .toast.error { background: #991b1b; }
+
+        @media (min-width: 720px) {
+            .container { max-width: 960px; }
+            #mainContent {
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+                gap: 14px;
+                align-items: start;
+            }
+            #mainContent .day-header,
+            #mainContent .milestone-card,
+            #mainContent .shopping-group-header,
+            #mainContent .empty-state {
+                grid-column: 1 / -1;
+            }
+            .scene-card { margin-bottom: 0; }
+        }
+
+        body.dark-mode {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --text-main: #e2e8f0;
+            --text-muted: #94a3b8;
+            --primary: #60a5fa;
+            --primary-light: #1e3a5f;
+            --border: #334155;
+            --accent: #fbbf24;
+            --accent-light: #3a2c0f;
+            --success: #4ade80;
+            --cast-color: #93c5fd;
+            --cast-light: #1e3a5f;
+        }
+        body.dark-mode .day-btn { background: #1e293b; border-color: #334155; color: var(--text-main); }
+        body.dark-mode .day-header { background: #1e293b; }
+        body.dark-mode .scene-synopsis { color: #cbd5e1; }
+        body.dark-mode .admin-notes-box { background: #1e293b; color: #cbd5e1; }
+        body.dark-mode .edit-container { background: #0f172a; }
+        body.dark-mode .edit-group input,
+        body.dark-mode .edit-group textarea,
+        body.dark-mode .edit-group select { background: #0f172a; color: var(--text-main); border-color: #334155; }
+        body.dark-mode .admin-prop-item { background: #0f172a; border-color: #334155; }
+        body.dark-mode .note-symbol-btn { background: #334155; border-color: #475569; color: var(--text-main); }
+        body.dark-mode .view-tab-btn { background: #1e293b; color: var(--text-muted); border-color: #334155; }
+        body.dark-mode .badge.cast { border-color: #3b82f6; }
+        body.dark-mode .badge.extra { background: #052e1a; color: #86efac; border-color: #166534; }
+        body.dark-mode .badge.date { background: #1e3a5f; }
+        body.dark-mode .props-section { background: #2a2210; border-color: #78350f; }
+        body.dark-mode .prop-item-public { color: #fbbf24; }
+        body.dark-mode .day-btn.active,
+        body.dark-mode .view-tab-btn.active { background: #2563eb; border-color: #2563eb; color: #fff; }
+        body.dark-mode .props-manager { background: #1e293b; }
+        body.dark-mode .admin-prop-item input,
+        body.dark-mode .admin-prop-item select,
+        body.dark-mode .admin-prop-item textarea { background: #0f172a; border-color: #334155; }
+        body.dark-mode .note-symbol-btn.has-note { background: #3a2c0f; border-color: #fbbf24; }
+        body.dark-mode .edit-toggle-btn { background: #1e3a5f; border-color: #334155; }
+        body.dark-mode .scene-card { box-shadow: none; }
+        body.dark-mode #searchInput { background: #1e293b; color: var(--text-main); border-color: #334155; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <button id="themeToggleBtn" class="theme-toggle-btn" onclick="toggleTheme()" title="Cambia tema">🌙</button>
+    <div class="app-content">
+        <div class="header-top">
+            <h1>Upgraded 2 PROPS</h1>
+        </div>
+
+        <button id="saveGlobalBtn" class="save-btn hidden" onclick="saveChanges()">💾 Salva tutte le modifiche</button>
+
+        <div class="view-tabs">
+            <button type="button" class="view-tab-btn" data-view="days" onclick="setViewMode('days')">📅 Giorni</button>
+            <button type="button" class="view-tab-btn" data-view="shopping" onclick="setViewMode('shopping')">🛒 Da comprare<span id="shoppingBadge" class="count-badge hidden"></span></button>
+        </div>
+
+        <div class="search-wrapper">
+            <input type="search" id="searchInput" placeholder="Cerca scena, attore, set o prop..." oninput="onSearchInput(this.value)">
+        </div>
+
+        <div class="days-scroll-wrapper" id="daysScrollWrapper">
+            <div class="days-scroll" id="daysContainer"></div>
+        </div>
+
+        <div id="mainContent"></div>
+    </div>
+
+    <div class="admin-footer">
+        <button id="adminToggleBtn" class="admin-toggle-link" onclick="toggleAdmin()">🔒 Admin Mode</button>
+        <div id="hiddenAdminControls" class="hidden" style="margin-top: 10px; display: flex; flex-direction: column; gap: 8px;">
+            <div style="display: flex; gap: 6px; justify-content: center;">
+                <button onclick="addNewScene()" style="background: var(--primary); color:white;">➕ Aggiungi Scena</button>
+                <button onclick="exportData()">💾 Esporta</button>
+                <button onclick="importDataClick()">📂 Importa</button>
+            </div>
+            <input type="file" id="importFile" style="display:none" onchange="importData(event)">
+        </div>
+    </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script src="config.js"></script>
+<script>
+    async function rpc(fn, args) {
+        const headers = { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY };
+        if (SUPABASE_ANON_KEY.startsWith('eyJ')) headers.Authorization = 'Bearer ' + SUPABASE_ANON_KEY;
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
+            method: 'POST', headers, body: JSON.stringify(args || {})
+        });
+        if (!res.ok) {
+            let msg = '';
+            try { msg = (await res.json()).message || ''; } catch (e) {}
+            const err = new Error(msg || ('HTTP ' + res.status));
+            err.code = msg;
+            throw err;
+        }
+        return res.json();
+    }
+
+    const THEME_KEY = 'upgraded_props_theme';
+
+    function escapeHtml(str) {
+        if (str === null || str === undefined) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function parseProps(propsInput) {
+        if (!propsInput) return [];
+        if (Array.isArray(propsInput)) {
+            return propsInput.map(p => {
+                if (typeof p === 'string') return { text: p, status: "green", note: "" };
+                return { text: p.text || "", status: p.status || "green", note: p.note || "" };
+            });
+        }
+        return String(propsInput).split(/,|\n/).map(p => p.trim()).filter(p => p.length > 0).map(p => {
+            return { text: p, status: "green", note: "" };
+        });
+    }
+
+    let dbScenes = [];
+    let currentDay = "";
+    let isAdmin = false;
+    let viewMode = "days";
+    let searchQuery = "";
+    let expandedScenes = new Set();
+    let dataVersion = null;
+    let isDirty = false;
+
+    function updateSaveButton() {
+        const btn = document.getElementById('saveGlobalBtn');
+        if (!btn || btn.disabled) return;
+        btn.textContent = isDirty ? '💾 Salva tutte le modifiche ●' : '💾 Salva tutte le modifiche';
+        btn.classList.toggle('dirty', isDirty);
+    }
+
+    function markDirty() {
+        isDirty = true;
+        updateSaveButton();
+    }
+
+    function clearDirty() {
+        isDirty = false;
+        updateSaveButton();
+    }
+
+    window.addEventListener('beforeunload', (e) => {
+        if (isDirty) {
+            e.preventDefault();
+            e.returnValue = '';
+        }
+    });
+
+    function showToast(message, isError) {
+        const toast = document.getElementById('toast');
+        toast.textContent = message;
+        toast.className = 'toast show' + (isError ? ' error' : '');
+        clearTimeout(toast._hideTimer);
+        toast._hideTimer = setTimeout(() => { toast.className = 'toast'; }, 2800);
+    }
+
+    function applyStoredTheme() {
+        const theme = localStorage.getItem(THEME_KEY);
+        if (theme === 'dark') {
+            document.body.classList.add('dark-mode');
+        }
+        document.getElementById('themeToggleBtn').textContent = document.body.classList.contains('dark-mode') ? '☀️' : '🌙';
+    }
+
+    function toggleTheme() {
+        document.body.classList.toggle('dark-mode');
+        const isDark = document.body.classList.contains('dark-mode');
+        localStorage.setItem(THEME_KEY, isDark ? 'dark' : 'light');
+        document.getElementById('themeToggleBtn').textContent = isDark ? '☀️' : '🌙';
+    }
+
+    function renderLoading() {
+        document.getElementById('mainContent').innerHTML = '<p style="text-align:center; color:var(--text-muted); padding: 24px 0;">Caricamento in corso…</p>';
+    }
+
+    async function loadData() {
+        renderLoading();
+        try {
+            const result = await rpc('get_scenes');
+            const data = result.scenes;
+            dataVersion = result.version;
+            dbScenes = data.map(s => ({ ...s, props: parseProps(s.props) }));
+            expandedScenes = new Set();
+            clearDirty();
+        } catch (e) {
+            console.error(e);
+            showToast('⚠️ Impossibile caricare i dati dal server.', true);
+            dbScenes = [];
+        }
+        const availableDays = [...new Set(dbScenes.map(s => s.data))];
+        if (availableDays.length > 0 && !availableDays.includes(currentDay)) {
+            currentDay = availableDays[0];
+        }
+        renderApp();
+    }
+
+    function matchesSearch(s, q) {
+        if (!q) return true;
+        const hay = [s.scena, s.set, s.sinossi, s.cast, s.extras];
+        if (isAdmin) hay.push(s.adminNotes);
+        (s.props || []).forEach(p => {
+            hay.push(p.text);
+            if (isAdmin) hay.push(p.note);
+        });
+        return hay.join(' \n ').toLowerCase().includes(q);
+    }
+
+    function countPendingProps() {
+        let n = 0;
+        dbScenes.forEach(s => (s.props || []).forEach(p => {
+            if (p.status === 'red' || p.status === 'yellow') n++;
+        }));
+        return n;
+    }
+
+    function setViewMode(mode) {
+        syncInputsToDb();
+        viewMode = mode;
+        renderApp();
+    }
+
+    function onSearchInput(value) {
+        syncInputsToDb();
+        searchQuery = value.trim().toLowerCase();
+        renderApp();
+    }
+
+    function setDay(day) {
+        syncInputsToDb();
+        currentDay = day;
+        searchQuery = "";
+        viewMode = "days";
+        const input = document.getElementById('searchInput');
+        if (input) input.value = "";
+        renderApp();
+    }
+
+    function renderApp() {
+        document.querySelectorAll('.view-tab-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.view === viewMode);
+        });
+        const pending = countPendingProps();
+        const badge = document.getElementById('shoppingBadge');
+        badge.textContent = pending > 0 ? pending : '';
+        badge.classList.toggle('hidden', pending === 0);
+
+        document.getElementById('daysScrollWrapper').classList.toggle('hidden', viewMode === 'shopping');
+
+        const availableDays = [...new Set(dbScenes.map(s => s.data))];
+        let daysHTML = '';
+        availableDays.forEach(d => {
+            const active = (viewMode === 'days' && !searchQuery && currentDay === d) ? 'active' : '';
+            daysHTML += `<div class="day-btn ${active}" data-day="${escapeHtml(d)}" onclick="setDay(this.dataset.day)">
+                <span class="label">${escapeHtml(d)}</span>
+            </div>`;
+        });
+        document.getElementById('daysContainer').innerHTML = daysHTML;
+
+        document.getElementById('mainContent').innerHTML = viewMode === 'shopping'
+            ? renderShoppingListHTML()
+            : renderDaysHTML();
+    }
+
+    function renderDaysHTML() {
+        let filtered;
+        let headerTitle;
+        let headerSubtitle = '';
+
+        if (searchQuery) {
+            filtered = dbScenes.filter(s => matchesSearch(s, searchQuery));
+            headerTitle = `Risultati per &quot;${escapeHtml(searchQuery)}&quot;`;
+            headerSubtitle = `${filtered.length} scena/e trovate su tutte le date`;
+        } else {
+            filtered = dbScenes.filter(s => s.data === currentDay);
+            headerTitle = escapeHtml(currentDay) || 'Nessuna data selezionata';
+            const castSet = new Set();
+            filtered.forEach(s => (s.cast || '').split(',').map(c => c.trim()).filter(Boolean).forEach(c => castSet.add(c)));
+            const pendingInDay = filtered.reduce((n, s) => n + (s.props || []).filter(p => p.status === 'red' || p.status === 'yellow').length, 0);
+            headerSubtitle = `${filtered.length} scene · ${castSet.size} attori coinvolti` + (pendingInDay > 0 ? ` · 🛒 ${pendingInDay} props da preparare` : '');
+        }
+
+        let html = `
+            <div class="day-header">
+                <div>
+                    <h2>${headerTitle}</h2>
+                    ${headerSubtitle ? `<div class="day-summary">${headerSubtitle}</div>` : ''}
+                </div>
+                ${isAdmin && !searchQuery ? `<button onclick="addNewScene()" style="background:var(--primary); color:white; font-size:12px; padding:6px 12px; flex-shrink:0;">➕ Aggiungi Scena Qui</button>` : ''}
+            </div>
+        `;
+
+        if (filtered.length === 0) {
+            html += `<p class="empty-state" style="text-align:center; color:var(--text-muted);">${searchQuery ? 'Nessuna scena corrisponde alla ricerca.' : 'Nessuna scena registrata per questa data.'}</p>`;
+        }
+
+        filtered.forEach(s => { html += renderSceneCard(s, !!searchQuery); });
+
+        if (!searchQuery && currentDay === "30 Ott") {
+            html += `
+                <div class="milestone-card">
+                    🎬 END OF VENICE SHOOTING
+                </div>
+            `;
+        }
+
+        return html;
+    }
+
+    function renderSceneCard(s, showDateBadge) {
+        const propsList = s.props || [];
+        let publicPropsHTML = "";
+        if (propsList.length > 0) {
+            const itemsList = propsList.map(p => `<div class="prop-item-public">• ${escapeHtml(p.text)}</div>`).join("");
+            publicPropsHTML = `
+                <div class="props-section">
+                    <span class="props-label">📦 Props</span>
+                    <div class="props-list">${itemsList}</div>
+                </div>
+            `;
+        }
+
+        let adminPropsHTML = "";
+        if (propsList.length > 0) {
+            adminPropsHTML = propsList.map((p, pIdx) => {
+                const rSel = p.status === 'red' ? 'selected' : '';
+                const ySel = p.status === 'yellow' ? 'selected' : '';
+                const gSel = p.status === 'green' ? 'selected' : '';
+                const hasNote = p.note && p.note.trim() !== "";
+                const noteBtnClass = hasNote ? "note-symbol-btn has-note" : "note-symbol-btn";
+                const noteContainerStyle = hasNote ? "" : "display:none;";
+
+                return `
+                    <div class="admin-prop-item" data-prop-index="${pIdx}">
+                        <div class="admin-prop-row">
+                            <input type="text" class="prop-text-input" value="${escapeHtml(p.text)}" placeholder="Nome prop (es. Antonio: ...)" style="flex: 1;">
+                            <select class="prop-status-input" style="width: 110px;">
+                                <option value="red" ${rSel}>🔴 Da comprare</option>
+                                <option value="yellow" ${ySel}>🟡 Comprato</option>
+                                <option value="green" ${gSel}>🟢 Sul camion</option>
+                            </select>
+                            <button type="button" class="${noteBtnClass}" onclick="togglePropNote(${s.id}, ${pIdx})" title="Note prop">📝</button>
+                            <button type="button" onclick="removeProp(${s.id}, ${pIdx})" style="background:#fee2e2; color:#991b1b; border:none; border-radius:6px; padding:7px 10px; font-weight:bold;" title="Rimuovi prop">✕</button>
+                        </div>
+                        <div class="prop-note-inline" style="${noteContainerStyle}">
+                            <textarea class="prop-note-input" placeholder="Nota specifica per questo prop..." style="height: 38px; font-size: 12px;">${escapeHtml(p.note || '')}</textarea>
+                        </div>
+                    </div>
+                `;
+            }).join("");
+        } else {
+            adminPropsHTML = `<p style="font-size:12px; color:var(--text-muted); margin: 4px 0;">Nessun prop registrato.</p>`;
+        }
+
+        const expanded = expandedScenes.has(s.id);
+
+        return `
+            <div class="scene-card" data-id="${s.id}">
+                <div class="scene-top">
+                    <span class="scene-num">${escapeHtml(s.scena)}</span>
+                    <div style="display:flex; gap:6px; align-items:center;">
+                        ${showDateBadge ? `<span class="badge date">📅 ${escapeHtml(s.data)}</span>` : ''}
+                        ${isAdmin ? `<button type="button" class="edit-toggle-btn" onclick="toggleEditor(${s.id})">${expanded ? '✖️ Chiudi' : '✏️ Modifica'}</button>` : ''}
+                    </div>
+                </div>
+                <div class="scene-set">${escapeHtml(s.set)}</div>
+                <div class="scene-synopsis">${escapeHtml(s.sinossi)}</div>
+
+                <div class="badges-top">
+                    ${s.cast ? `<span class="badge cast">🎭 Cast: ${escapeHtml(s.cast)}</span>` : ''}
+                    ${s.extras ? `<span class="badge extra">👥 Extras: ${escapeHtml(s.extras)}</span>` : ''}
+                </div>
+
+                ${publicPropsHTML}
+
+                ${isAdmin && s.adminNotes ? `
+                    <div class="admin-notes-box">
+                        <span class="admin-notes-title">🔒 Note Interne / Segnalazioni:</span>
+                        ${escapeHtml(s.adminNotes)}
+                    </div>
+                ` : ''}
+
+                <div class="edit-container ${isAdmin && expanded ? '' : 'hidden'}">
+                    <div class="edit-row">
+                        <div class="edit-group" style="flex: 0 0 75px;">
+                            <label>Scena</label>
+                            <input type="text" class="input-scena" data-id="${s.id}" value="${escapeHtml(s.scena || '')}">
+                        </div>
+                        <div class="edit-group" style="flex: 0 0 85px;">
+                            <label>Data</label>
+                            <input type="text" class="input-data" data-id="${s.id}" value="${escapeHtml(s.data || '')}" placeholder="Es: 19 Ott">
+                        </div>
+                        <div class="edit-group">
+                            <label>Set</label>
+                            <input type="text" class="input-set" data-id="${s.id}" value="${escapeHtml(s.set || '')}">
+                        </div>
+                    </div>
+                    <div class="edit-group full">
+                        <label>Sinossi</label>
+                        <textarea class="input-sinossi" data-id="${s.id}">${escapeHtml(s.sinossi || '')}</textarea>
+                    </div>
+                    <div class="edit-row">
+                        <div class="edit-group">
+                            <label>🎭 Cast</label>
+                            <input type="text" class="input-cast" data-id="${s.id}" value="${escapeHtml(s.cast || '')}" placeholder="Attori...">
+                        </div>
+                        <div class="edit-group">
+                            <label>👥 Extras</label>
+                            <input type="text" class="input-extras" data-id="${s.id}" value="${escapeHtml(s.extras || '')}" placeholder="Extras...">
+                        </div>
+                    </div>
+
+                    <div class="edit-group full props-manager">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                            <label style="margin:0;">📦 Gestione Singoli Props</label>
+                            <button type="button" onclick="addProp(${s.id})" style="background:var(--primary); color:white; font-size:11px; padding:4px 8px;">➕ Aggiungi Prop</button>
+                        </div>
+                        <div class="admin-props-container" data-id="${s.id}">
+                            ${adminPropsHTML}
+                        </div>
+                    </div>
+
+                    <div class="edit-row" style="margin-top: 4px; align-items: flex-end;">
+                        <div class="edit-group full">
+                            <label>🔒 Note Interne Scena (Nascoste ai collaboratori)</label>
+                            <input type="text" class="input-adminnotes" data-id="${s.id}" value="${escapeHtml(s.adminNotes || '')}" placeholder="Note generali di scena...">
+                        </div>
+                        <div style="display: flex; gap: 4px; margin-bottom: 2px;">
+                            <button onclick="moveScene(${s.id}, -1)" title="Sposta su" style="background:#e2e8f0; font-weight:bold; padding:8px 10px;">⬆️</button>
+                            <button onclick="moveScene(${s.id}, 1)" title="Sposta giù" style="background:#e2e8f0; font-weight:bold; padding:8px 10px;">⬇️</button>
+                            <button onclick="deleteScene(${s.id})" style="background:#fee2e2; color:#991b1b; border:none; border-radius:6px; padding:8px 12px; font-weight:bold;" title="Elimina scena">🗑️</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    function renderShoppingListHTML() {
+        let items = [];
+        dbScenes.forEach(s => {
+            (s.props || []).forEach(p => {
+                if (p.status === 'red' || p.status === 'yellow') {
+                    items.push({ sceneId: s.id, day: s.data, scena: s.scena, set: s.set, text: p.text, status: p.status, note: p.note });
+                }
+            });
+        });
+
+        if (searchQuery) {
+            items = items.filter(it => (it.text + ' ' + it.scena + ' ' + it.set).toLowerCase().includes(searchQuery));
+        }
+
+        let html = `
+            <div class="day-header">
+                <div>
+                    <h2>🛒 Lista Acquisti</h2>
+                    <div class="day-summary">${items.length} props da preparare in totale</div>
+                </div>
+            </div>
+        `;
+
+        if (items.length === 0) {
+            html += `<p class="empty-state" style="text-align:center; color:var(--text-muted);">Tutti i props sono pronti! 🎉</p>`;
+            return html;
+        }
+
+        const renderGroup = (title, list) => {
+            if (list.length === 0) return '';
+            let out = `<div class="shopping-group-header">${title} (${list.length})</div>`;
+            out += list.map(it => `
+                <div class="scene-card shopping-item" data-day="${escapeHtml(it.day)}" onclick="jumpToScene(${it.sceneId}, this.dataset.day)">
+                    <div class="scene-top">
+                        <span class="scene-num">${escapeHtml(it.scena)}</span>
+                        <span class="badge date">📅 ${escapeHtml(it.day)}</span>
+                    </div>
+                    <div class="scene-set">${escapeHtml(it.set)}</div>
+                    <div class="prop-item-public" style="font-weight:600;">${it.status === 'red' ? '🔴' : '🟡'} ${escapeHtml(it.text)}</div>
+                    ${isAdmin && it.note ? `<div class="admin-notes-box"><span class="admin-notes-title">📝 Nota</span>${escapeHtml(it.note)}</div>` : ''}
+                </div>
+            `).join('');
+            return out;
+        };
+
+        html += renderGroup('🔴 Da comprare', items.filter(i => i.status === 'red'));
+        html += renderGroup('🟡 Comprato, da caricare', items.filter(i => i.status === 'yellow'));
+
+        return html;
+    }
+
+    function jumpToScene(sceneId, day) {
+        syncInputsToDb();
+        viewMode = "days";
+        currentDay = day;
+        searchQuery = "";
+        const input = document.getElementById('searchInput');
+        if (input) input.value = "";
+        if (isAdmin) expandedScenes.add(sceneId);
+        renderApp();
+        setTimeout(() => {
+            const el = document.querySelector(`.scene-card[data-id="${sceneId}"]`);
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 50);
+    }
+
+    function toggleAdmin() {
+        syncInputsToDb();
+        isAdmin = !isAdmin;
+        const btn = document.getElementById('adminToggleBtn');
+        const controls = document.getElementById('hiddenAdminControls');
+        const saveGlobal = document.getElementById('saveGlobalBtn');
+
+        if (isAdmin) {
+            btn.innerText = "🔓 Admin Mode Attiva";
+            btn.style.color = "var(--primary)";
+            controls.classList.remove('hidden');
+            saveGlobal.classList.remove('hidden');
+        } else {
+            btn.innerText = "🔒 Admin Mode";
+            btn.style.color = "var(--text-muted)";
+            controls.classList.add('hidden');
+            saveGlobal.classList.add('hidden');
+        }
+        renderApp();
+    }
+
+    function toggleEditor(sceneId) {
+        syncInputsToDb();
+        if (expandedScenes.has(sceneId)) {
+            expandedScenes.delete(sceneId);
+        } else {
+            expandedScenes.add(sceneId);
+        }
+        renderApp();
+    }
+
+    function togglePropNote(sceneId, propIndex) {
+        syncInputsToDb();
+        const sceneCard = document.querySelector(`.scene-card[data-id="${sceneId}"]`);
+        if (sceneCard) {
+            const propItems = sceneCard.querySelectorAll('.admin-prop-item');
+            const targetItem = propItems[propIndex];
+            if (targetItem) {
+                const noteInline = targetItem.querySelector('.prop-note-inline');
+                const noteBtn = targetItem.querySelector('.note-symbol-btn');
+                if (noteInline.style.display === 'none' || noteInline.style.display === '') {
+                    noteInline.style.display = 'block';
+                } else {
+                    noteInline.style.display = 'none';
+                    const noteInput = targetItem.querySelector('.prop-note-input');
+                    if (noteInput.value.trim() !== "") {
+                        noteBtn.classList.add('has-note');
+                    } else {
+                        noteBtn.classList.remove('has-note');
+                    }
+                }
+            }
+        }
+    }
+
+    function addNewScene() {
+        syncInputsToDb();
+        const newId = dbScenes.length > 0 ? Math.min(...dbScenes.map(s => s.id)) - 1 : -1;
+        dbScenes.push({
+            id: newId,
+            scena: `sc.nuova`,
+            data: currentDay,
+            set: "INT. NUOVO SET - DAY",
+            sinossi: "Descrizione della scena...",
+            cast: "",
+            props: [],
+            extras: "",
+            adminNotes: ""
+        });
+        expandedScenes.add(newId);
+        markDirty();
+        renderApp();
+    }
+
+    function addProp(sceneId) {
+        syncInputsToDb();
+        const scene = dbScenes.find(s => s.id === sceneId);
+        if (scene) {
+            scene.props.push({ text: "", status: "red", note: "" });
+            markDirty();
+            renderApp();
+        }
+    }
+
+    function removeProp(sceneId, propIndex) {
+        syncInputsToDb();
+        const scene = dbScenes.find(s => s.id === sceneId);
+        if (scene) {
+            scene.props.splice(propIndex, 1);
+            markDirty();
+            renderApp();
+        }
+    }
+
+    function deleteScene(id) {
+        if (confirm("Vuoi davvero eliminare questa scena?")) {
+            dbScenes = dbScenes.filter(s => s.id !== id);
+            expandedScenes.delete(id);
+            markDirty();
+            renderApp();
+        }
+    }
+
+    function moveScene(id, direction) {
+        syncInputsToDb();
+        const dayScenes = dbScenes.filter(s => s.data === currentDay);
+        const indexInDay = dayScenes.findIndex(s => s.id === id);
+
+        if ((direction === -1 && indexInDay > 0) || (direction === 1 && indexInDay < dayScenes.length - 1)) {
+            const targetScene = dayScenes[indexInDay + direction];
+            const globalIndexA = dbScenes.findIndex(s => s.id === id);
+            const globalIndexB = dbScenes.findIndex(s => s.id === targetScene.id);
+
+            const temp = dbScenes[globalIndexA];
+            dbScenes[globalIndexA] = dbScenes[globalIndexB];
+            dbScenes[globalIndexB] = temp;
+
+            markDirty();
+            renderApp();
+        }
+    }
+
+    function syncInputsToDb() {
+        dbScenes.forEach(scene => {
+            const scInput = document.querySelector(`.input-scena[data-id="${scene.id}"]`);
+            const dataInput = document.querySelector(`.input-data[data-id="${scene.id}"]`);
+            const setInput = document.querySelector(`.input-set[data-id="${scene.id}"]`);
+            const sinInput = document.querySelector(`.input-sinossi[data-id="${scene.id}"]`);
+            const castInput = document.querySelector(`.input-cast[data-id="${scene.id}"]`);
+            const extrasInput = document.querySelector(`.input-extras[data-id="${scene.id}"]`);
+            const adminNotesInput = document.querySelector(`.input-adminnotes[data-id="${scene.id}"]`);
+
+            if (scInput) scene.scena = scInput.value;
+            if (dataInput) scene.data = dataInput.value;
+            if (setInput) scene.set = setInput.value;
+            if (sinInput) scene.sinossi = sinInput.value;
+            if (castInput) scene.cast = castInput.value;
+            if (extrasInput) scene.extras = extrasInput.value;
+            if (adminNotesInput) scene.adminNotes = adminNotesInput.value;
+
+            const propsContainer = document.querySelector(`.admin-props-container[data-id="${scene.id}"]`);
+            if (propsContainer) {
+                const propItems = propsContainer.querySelectorAll('.admin-prop-item');
+                let updatedProps = [];
+                propItems.forEach(item => {
+                    const textVal = item.querySelector('.prop-text-input').value;
+                    const statusVal = item.querySelector('.prop-status-input').value;
+                    const noteVal = item.querySelector('.prop-note-input').value;
+                    if (textVal.trim() !== "") {
+                        updatedProps.push({ text: textVal, status: statusVal, note: noteVal });
+                    }
+                });
+                scene.props = updatedProps;
+            }
+        });
+    }
+
+    async function saveChanges() {
+        syncInputsToDb();
+        const btn = document.getElementById('saveGlobalBtn');
+
+        let allowEmpty = false;
+        if (dbScenes.length === 0) {
+            if (!confirm("Non c'è nessuna scena: salvando cancellerai TUTTI i dati dal server. Continuare?")) return;
+            allowEmpty = true;
+        }
+
+        btn.textContent = '💾 Salvataggio…';
+        btn.disabled = true;
+        try {
+            let saved;
+            try {
+                saved = await sendScenes(dbScenes, { allowEmpty, force: false });
+            } catch (err) {
+                if (err.code !== 'CONFLICT') throw err;
+                const overwrite = confirm(
+                    "Qualcuno ha salvato delle modifiche mentre stavi lavorando.\n\n" +
+                    "OK = sovrascrivi con le TUE modifiche\n" +
+                    "Annulla = non salvare (le tue modifiche restano sullo schermo, puoi fare un Esporta di backup)"
+                );
+                if (!overwrite) {
+                    showToast('Salvataggio annullato: i dati sul server sono più recenti.', true);
+                    return;
+                }
+                saved = await sendScenes(dbScenes, { allowEmpty, force: true });
+            }
+            applySaved(saved.scenes, saved.version);
+            showToast('✅ Modifiche salvate e pubblicate.');
+        } catch (e) {
+            console.error(e);
+            showToast('⚠️ Salvataggio non riuscito. Riprova.', true);
+        } finally {
+            btn.disabled = false;
+            updateSaveButton();
+            renderApp();
+        }
+    }
+
+    function sendScenes(list, { allowEmpty, force }) {
+        return rpc('replace_scenes', {
+            payload: list,
+            expected_version: force ? null : dataVersion,
+            allow_empty: !!allowEmpty,
+            force: !!force
+        });
+    }
+
+    function applySaved(saved, version) {
+        dataVersion = version;
+        dbScenes = saved.map(s => ({ ...s, props: parseProps(s.props) }));
+        expandedScenes = new Set();
+        const availableDays = [...new Set(dbScenes.map(s => s.data))];
+        if (availableDays.length > 0 && !availableDays.includes(currentDay)) currentDay = availableDays[0];
+        clearDirty();
+    }
+
+    function exportData() {
+        syncInputsToDb();
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(dbScenes, null, 2));
+        const downloadAnchor = document.createElement('a');
+        downloadAnchor.setAttribute("href", dataStr);
+        downloadAnchor.setAttribute("download", "backup_scene_completo.json");
+        document.body.appendChild(downloadAnchor);
+        downloadAnchor.click();
+        downloadAnchor.remove();
+    }
+
+    function importDataClick() {
+        document.getElementById('importFile').click();
+    }
+
+    function importData(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const fileReader = new FileReader();
+        fileReader.readAsText(file, "UTF-8");
+        fileReader.onload = async function(e) {
+            try {
+                const parsed = JSON.parse(e.target.result);
+                if (!Array.isArray(parsed)) throw new Error("Formato non valido");
+                const nextScenes = parsed.map(s => ({ ...s, props: parseProps(s.props) }));
+                if (nextScenes.length === 0) throw new Error("Il backup è vuoto");
+                if (!confirm(`Importare ${nextScenes.length} scene? Sostituirà TUTTI i dati attuali sul server.`)) return;
+                const saved = await sendScenes(nextScenes, { allowEmpty: false, force: true });
+                applySaved(saved.scenes, saved.version);
+                const availableDays = [...new Set(dbScenes.map(s => s.data))];
+                currentDay = availableDays[0] || "";
+                renderApp();
+                showToast("✅ Backup importato e pubblicato.");
+            } catch (err) {
+                console.error(err);
+                showToast("⚠️ Errore nel file di backup.", true);
+            }
+        };
+        event.target.value = "";
+    }
+
+    function onEditorChange(e) {
+        if (isAdmin && e.target.closest && e.target.closest('.edit-container')) markDirty();
+    }
+    document.getElementById('mainContent').addEventListener('input', onEditorChange);
+    document.getElementById('mainContent').addEventListener('change', onEditorChange);
+
+    applyStoredTheme();
+    loadData();
+</script>
+
+</body>
+</html>
