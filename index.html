@@ -223,6 +223,7 @@
         }
         .badge.cast { background: var(--cast-light); color: var(--cast-color); border: 1px solid #bfdbfe; font-weight: 600; }
         .badge.extra { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
+        .badge.extra .extra-count { display: inline-block; padding: 0 3px; border-radius: 4px; background: rgba(255,255,255,.8); color: #14532d; font-size: 1.05em; font-weight: 800; white-space: nowrap; }
         .badge.date { background: var(--primary-light); color: var(--primary); border: 1px solid var(--border); white-space: nowrap; }
 
         .props-section {
@@ -488,6 +489,7 @@
         body.dark-mode .view-tab-btn { background: #1e293b; color: var(--text-muted); border-color: #334155; }
         body.dark-mode .badge.cast { border-color: #3b82f6; }
         body.dark-mode .badge.extra { background: #052e1a; color: #86efac; border-color: #166534; }
+        body.dark-mode .badge.extra .extra-count { background: #064e3b; color: #d1fae5; }
         body.dark-mode .badge.date { background: #1e3a5f; }
         body.dark-mode .props-section { background: #2a2210; border-color: #78350f; }
         body.dark-mode .prop-item-public { color: #fbbf24; }
@@ -892,6 +894,11 @@
     }
 
     function renderGroupedProps(props) {
+        const formatCharacter = value => value.trim()
+            .replace(/\s*,\s*/g, ', ')
+            .replace(/\s+/g, ' ')
+            .toLocaleLowerCase()
+            .replace(/(^|[\s,])(\p{L})/gu, (_, separator, letter) => separator + letter.toLocaleUpperCase());
         const groups = new Map();
         props.forEach(p => {
             const text = String(p.text || '').trim();
@@ -903,9 +910,12 @@
             if (!groups.has(key)) groups.set(key, { character, items: [] });
             groups.get(key).items.push(name);
         });
-        return [...groups.values()].map(group => `
+        const orderedGroups = [...groups.values()];
+        const backgroundIndex = orderedGroups.findIndex(group => group.character.toLocaleLowerCase() === 'background');
+        if (backgroundIndex >= 0) orderedGroups.push(...orderedGroups.splice(backgroundIndex, 1));
+        return orderedGroups.map(group => `
             <div class="prop-group prop-item-public">
-                ${group.character ? `<strong class="prop-group-name">${escapeHtml(group.character)}</strong>` : ''}
+                ${group.character ? `<strong class="prop-group-name">${escapeHtml(formatCharacter(group.character))}</strong>` : ''}
                 <ul class="prop-group-items">${group.items.map(name => `<li>${escapeHtml(name)}</li>`).join('')}</ul>
             </div>
         `).join('');
@@ -913,6 +923,19 @@
 
     function renderSceneCard(s, showDateBadge) {
         const propsList = s.props || [];
+        const renderExtras = value => String(value).split(/\r?\n/).flatMap(section => {
+            const prefix = section.match(/^([^:;]+:\s*)/)?.[0] || '';
+            return (prefix ? section.slice(prefix.length) : section).split(';')
+                .filter(text => text.trim())
+                .map(text => prefix.trim() ? `${prefix.trim()} ${text.trim()}` : text.trim());
+        }).map((text, index) => {
+            const count = text.match(/(\d+)\s*x\b/i);
+            return { text, index, count: count ? Number(count[1]) : null };
+        }).sort((a, b) => {
+            if (a.count === null) return b.count === null ? a.index - b.index : 1;
+            if (b.count === null) return -1;
+            return b.count - a.count || a.index - b.index;
+        }).map(entry => entry.text).join('; ');
         let publicPropsHTML = "";
         if (propsList.length > 0) {
             const itemsList = renderGroupedProps(propsList);
@@ -972,7 +995,7 @@
 
                 <div class="badges-top">
                     ${s.cast ? `<span class="badge cast">🎭 Cast: ${escapeHtml(s.cast)}</span>` : ''}
-                    ${s.extras ? `<span class="badge extra">👥 Extras: ${escapeHtml(s.extras)}</span>` : ''}
+                    ${s.extras ? `<span class="badge extra">👥 Extras: ${escapeHtml(renderExtras(s.extras)).replace(/(\d+\s*x\b)/gi, '<strong class="extra-count">$1</strong>')}</span>` : ''}
                 </div>
 
                 ${publicPropsHTML}
