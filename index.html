@@ -186,6 +186,20 @@
 
         .scene-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; gap: 8px; }
         .scene-num { font-weight: bold; font-size: 17px; color: var(--primary); }
+        .scene-card.needs-review { border-left: 4px solid #dc2626; }
+        .review-note-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+        .review-note-heading label { margin: 0; }
+        .review-flag-btn { background: var(--card-bg); color: var(--text-main); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; font-size: 12px; }
+        .review-flag-btn[aria-pressed="true"] { background: #fee2e2; color: #991b1b; border-color: #dc2626; }
+        .review-list { display: grid; grid-column: 1 / -1; gap: 8px; }
+        .review-scene-row { width: 100%; min-width: 0; text-align: left; background: var(--card-bg); color: var(--text-main); border: 1px solid var(--border); border-left: 4px solid #dc2626; border-radius: 8px; padding: 10px 12px; font: inherit; }
+        .review-scene-row:hover { background: var(--primary-light); }
+        .review-scene-row:focus-visible, .review-flag-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+        .review-row-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+        .review-row-date { font-size: 12px; color: var(--text-muted); }
+        .review-row-summary, .review-row-note { display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; font-size: 13px; line-height: 1.4; margin-top: 4px; }
+        .review-row-summary { -webkit-line-clamp: 1; color: var(--text-muted); }
+        .review-row-note { -webkit-line-clamp: 2; white-space: pre-wrap; }
         .scene-set { font-size: 14px; font-weight: 700; color: var(--text-main); margin-bottom: 6px; }
         .scene-synopsis { font-size: 14px; color: #334155; margin-bottom: 10px; line-height: 1.4; }
 
@@ -503,6 +517,7 @@
 
         <div id="adminViewControls" class="view-tabs hidden">
             <button id="reviewPropsBtn" type="button" class="view-tab-btn" data-view="shopping" aria-pressed="false" aria-controls="mainContent" onclick="setViewMode(viewMode === 'shopping' ? 'days' : 'shopping')">📋 Da controllare<span id="shoppingBadge" class="count-badge hidden"></span></button>
+            <button id="reviewScenesBtn" type="button" class="view-tab-btn" data-view="review" aria-pressed="false" aria-controls="mainContent" onclick="setViewMode(viewMode === 'review' ? 'days' : 'review')">🚩 Scene da rivedere<span id="reviewScenesBadge" class="count-badge hidden"></span></button>
         </div>
 
         <div class="search-wrapper">
@@ -601,6 +616,7 @@
 </dialog>
 
 <script src="config.js"></script>
+<script src="scene-review.js"></script>
 <script>
     async function rpc(fn, args) {
         const headers = { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY };
@@ -747,7 +763,7 @@
     function matchesSearch(s, q) {
         if (!q) return true;
         const hay = [s.scena, s.set, s.sinossi, s.cast, s.extras];
-        if (isAdmin) hay.push(s.adminNotes);
+        if (isAdmin) hay.push(SceneReview.getNote(s.adminNotes));
         (s.props || []).forEach(p => {
             hay.push(p.text);
             if (isAdmin) hay.push(p.note);
@@ -765,7 +781,7 @@
 
     function setViewMode(mode) {
         syncInputsToDb();
-        viewMode = isAdmin && mode === 'shopping' ? 'shopping' : 'days';
+        viewMode = isAdmin && ['shopping', 'review'].includes(mode) ? mode : 'days';
         renderApp();
     }
 
@@ -810,6 +826,10 @@
         const badge = document.getElementById('shoppingBadge');
         badge.textContent = pending > 0 ? pending : '';
         badge.classList.toggle('hidden', pending === 0);
+        const reviewCount = dbScenes.filter(s => SceneReview.isFlagged(s.adminNotes)).length;
+        const reviewBadge = document.getElementById('reviewScenesBadge');
+        reviewBadge.textContent = reviewCount;
+        reviewBadge.classList.toggle('hidden', reviewCount === 0);
 
         const availableDays = getAvailableDays();
         let daysHTML = '';
@@ -823,7 +843,7 @@
 
         document.getElementById('mainContent').innerHTML = viewMode === 'shopping'
             ? renderShoppingListHTML()
-            : renderDaysHTML();
+            : viewMode === 'review' ? renderReviewScenesHTML() : renderDaysHTML();
     }
 
     function renderDaysHTML() {
@@ -939,7 +959,7 @@
         const expanded = expandedScenes.has(s.id);
 
         return `
-            <div class="scene-card" data-id="${s.id}">
+            <div class="scene-card ${isAdmin && SceneReview.isFlagged(s.adminNotes) ? 'needs-review' : ''}" data-id="${s.id}">
                 <div class="scene-top">
                     <span class="scene-num">${escapeHtml(s.scena)}</span>
                     <div style="display:flex; gap:6px; align-items:center;">
@@ -957,10 +977,10 @@
 
                 ${publicPropsHTML}
 
-                ${isAdmin && s.adminNotes ? `
+                ${isAdmin && SceneReview.getNote(s.adminNotes) ? `
                     <div class="admin-notes-box">
                         <span class="admin-notes-title">🔒 Note Interne / Segnalazioni:</span>
-                        ${escapeHtml(s.adminNotes)}
+                        ${escapeHtml(SceneReview.getNote(s.adminNotes))}
                     </div>
                 ` : ''}
 
@@ -1006,8 +1026,11 @@
 
                     <div class="edit-row wrap" style="margin-top: 4px; align-items: flex-end;">
                         <div class="edit-group full">
-                            <label>🔒 Note Interne Scena</label>
-                            <textarea class="input-adminnotes autogrow single" rows="1" data-id="${s.id}" placeholder="Note generali di scena...">${escapeHtml(s.adminNotes || '')}</textarea>
+                            <div class="review-note-heading">
+                                <label for="adminnotes-${s.id}">🔒 Note Interne Scena</label>
+                                ${isAdmin ? `<button type="button" class="review-flag-btn" data-scene-id="${s.id}" aria-pressed="${SceneReview.isFlagged(s.adminNotes)}" aria-label="${SceneReview.isFlagged(s.adminNotes) ? 'Rimuovi segnalazione' : 'Segnala da rivedere'}: ${escapeHtml(s.scena)}" onclick="toggleSceneReview(${s.id})">${SceneReview.isFlagged(s.adminNotes) ? '🚩 Da rivedere' : '⚑ Segnala'}</button>` : ''}
+                            </div>
+                            <textarea id="adminnotes-${s.id}" class="input-adminnotes autogrow single" rows="1" data-id="${s.id}" placeholder="Note generali di scena...">${escapeHtml(SceneReview.getNote(s.adminNotes))}</textarea>
                         </div>
                         <div style="display: flex; gap: 6px; margin-bottom: 2px; flex: 1 1 100%; justify-content: flex-end;">
                             <button onclick="moveScene(${s.id}, -1)" title="Sposta su" style="background:#e2e8f0; font-weight:bold; padding:8px 10px;">⬆️</button>
@@ -1018,6 +1041,34 @@
                 </div>
             </div>
         `;
+    }
+
+    function toggleSceneReview(id) {
+        if (!isAdmin || isSaving) return;
+        syncInputsToDb();
+        const scene = dbScenes.find(s => s.id === id);
+        if (!scene) return;
+        scene.adminNotes = SceneReview.toggle(scene.adminNotes);
+        markDirty();
+        renderApp();
+        document.querySelector(`.review-flag-btn[data-scene-id="${id}"]`)?.focus({ preventScroll: true });
+    }
+
+    function renderReviewScenesHTML() {
+        if (!isAdmin) return '';
+        const flagged = dbScenes.filter(s => SceneReview.isFlagged(s.adminNotes));
+        const scenes = flagged.filter(s => matchesSearch(s, searchQuery));
+        return `<div class="day-header"><div>
+            <h2>🚩 Scene da rivedere</h2>
+            <div class="day-summary">${scenes.length} di ${flagged.length} scene segnalate · Tutte le date · Seleziona una scena per aprirla</div>
+        </div></div>
+        <div class="review-list">${scenes.length ? scenes.map(s => `
+            <button type="button" class="review-scene-row" data-day="${escapeHtml(s.data)}" onclick="jumpToScene(${s.id}, this.dataset.day)">
+                <span class="review-row-heading"><strong>🚩 ${escapeHtml(s.scena)}</strong><span class="review-row-date">${escapeHtml(s.data)}</span></span>
+                <span class="review-row-summary">${escapeHtml(s.sinossi) || 'Nessuna sinossi'}</span>
+                <span class="review-row-note">${escapeHtml(SceneReview.getNote(s.adminNotes)) || 'Nessuna nota interna'}</span>
+            </button>`).join('') : `<p>${flagged.length ? 'Nessuna scena segnalata corrisponde alla ricerca.' : 'Nessuna scena da rivedere. Usa ⚑ Segnala accanto alle note interne di una scena.'}</p>`}
+        </div>`;
     }
 
     function renderShoppingListHTML() {
@@ -1228,7 +1279,7 @@
             if (sinInput) scene.sinossi = sinInput.value;
             if (castInput) scene.cast = castInput.value;
             if (extrasInput) scene.extras = extrasInput.value;
-            if (adminNotesInput) scene.adminNotes = adminNotesInput.value;
+            if (adminNotesInput) scene.adminNotes = SceneReview.setNote(scene.adminNotes, adminNotesInput.value);
 
             const propsContainer = document.querySelector(`.admin-props-container[data-id="${scene.id}"]`);
             if (propsContainer) {
