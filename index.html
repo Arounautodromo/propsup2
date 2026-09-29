@@ -410,23 +410,23 @@
         .toast.show { opacity: 1; transform: translate(-50%, 0); }
         .toast.error { background: #991b1b; }
 
-        body.admin-editing { padding-bottom: calc(120px + env(safe-area-inset-bottom)); }
-        body.admin-editing .toast { bottom: calc(110px + env(safe-area-inset-bottom)); }
+        body.save-dock-visible { padding-bottom: calc(74px + env(safe-area-inset-bottom)); }
+        body.save-dock-visible .toast { bottom: calc(78px + env(safe-area-inset-bottom)); }
         .save-dock {
-            position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+            position: fixed; bottom: calc(12px + env(safe-area-inset-bottom)); right: 12px; z-index: 100;
+            max-width: calc(100vw - 24px);
             background: var(--card-bg); color: var(--text-main);
-            border-top: 2px solid var(--border); box-shadow: 0 -4px 18px rgba(0,0,0,.12);
-            padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
-            display: flex; align-items: center; justify-content: center; gap: 16px;
+            border: 1px solid var(--border); border-radius: 12px;
+            box-shadow: 0 4px 18px rgba(0,0,0,.18);
+            padding: 8px;
+            display: flex; align-items: center; gap: 10px;
         }
-        .save-dock.has-changes { border-top-color: var(--accent); }
-        .save-dock-status { font-size: 14px; font-weight: 600; }
-        .save-dock-hint { margin-top: 3px; font-size: 12px; color: var(--text-muted); }
-        #saveDockBtn { background: #15803d; color: white; min-height: 44px; flex-shrink: 0; }
+        .save-dock.has-changes { border-color: var(--accent); }
+        .save-dock-status { font-size: 12px; font-weight: 700; line-height: 1.2; }
+        #saveDockBtn { background: #15803d; color: white; min-height: 38px; flex-shrink: 0; }
         @media (max-width: 480px) {
-            .save-dock { gap: 10px; padding-left: 12px; padding-right: 12px; }
-            .save-dock-status { font-size: 13px; }
-            .save-dock-hint { display: none; }
+            .save-dock { bottom: calc(8px + env(safe-area-inset-bottom)); right: 8px; max-width: calc(100vw - 16px); }
+            #saveDockBtn { padding: 8px 10px; }
         }
 
         @media (min-width: 720px) {
@@ -532,11 +532,8 @@
 
 <div id="toast" class="toast"></div>
 <div id="saveDock" class="save-dock hidden" role="region" aria-label="Salvataggio modifiche">
-    <div>
-        <div id="saveDockStatus" class="save-dock-status" role="status" aria-live="polite">✓ Tutte le modifiche salvate</div>
-        <div class="save-dock-hint">Salva da qui oppure premi Ctrl+Invio / ⌘+Invio</div>
-    </div>
-    <button id="saveDockBtn" type="button" onclick="saveChanges()" disabled>💾 Salva modifiche</button>
+    <span id="saveDockStatus" class="save-dock-status" role="status" aria-live="polite">● Da salvare</span>
+    <button id="saveDockBtn" type="button" onclick="saveChanges()" title="Salva anche con Ctrl+Invio o ⌘+Invio" disabled>💾 Salva</button>
 </div>
 
 <dialog id="scheduleDialog" aria-labelledby="scheduleTitle" aria-describedby="scheduleIntro">
@@ -670,12 +667,14 @@
         btn.textContent = isSaving ? '💾 Salvataggio…' : isDirty ? '💾 Salva tutte le modifiche ●' : '💾 Salva tutte le modifiche';
         btn.classList.toggle('dirty', isDirty);
         const dock = document.getElementById('saveDock');
-        dock.classList.toggle('hidden', !isAdmin);
+        const showDock = isAdmin && (isDirty || isSaving || saveFailed);
+        dock.classList.toggle('hidden', !showDock);
+        document.body.classList.toggle('save-dock-visible', showDock);
         dock.classList.toggle('has-changes', isDirty || saveFailed);
         document.getElementById('saveDockBtn').disabled = isSaving || !isDirty;
-        document.getElementById('saveDockBtn').textContent = isSaving ? '💾 Salvataggio…' : '💾 Salva modifiche';
+        document.getElementById('saveDockBtn').textContent = isSaving ? 'Salvataggio…' : '💾 Salva';
         document.getElementById('saveDockStatus').textContent = isSaving ? 'Salvataggio in corso…' : saveFailed
-            ? '⚠️ Modifiche ancora da salvare. Riprova.' : isDirty ? '● Modifiche non salvate' : '✓ Tutte le modifiche salvate';
+            ? '⚠️ Da salvare' : '● Da salvare';
     }
 
     function markDirty() {
@@ -1107,7 +1106,6 @@
             controls.classList.add('hidden');
             saveGlobal.classList.add('hidden');
         }
-        document.body.classList.toggle('admin-editing', isAdmin);
         updateSaveButton();
         renderApp();
     }
