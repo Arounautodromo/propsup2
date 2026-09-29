@@ -469,6 +469,7 @@
         body.dark-mode .scene-card { box-shadow: none; }
         body.dark-mode #searchInput { background: #1e293b; color: var(--text-main); border-color: #334155; }
     </style>
+    <link rel="stylesheet" href="schedule-import.css">
 </head>
 <body>
 
@@ -499,17 +500,82 @@
     <div class="admin-footer">
         <button id="adminToggleBtn" class="admin-toggle-link" onclick="toggleAdmin()">🔒 Admin Mode</button>
         <div id="hiddenAdminControls" class="hidden" style="margin-top: 10px; display: flex; flex-direction: column; gap: 8px;">
-            <div style="display: flex; gap: 6px; justify-content: center;">
+            <div style="display: flex; flex-wrap: wrap; gap: 6px; justify-content: center;">
                 <button onclick="addNewScene()" style="background: var(--primary); color:white;">➕ Aggiungi Scena</button>
-                <button onclick="exportData()">💾 Esporta</button>
-                <button onclick="importDataClick()">📂 Importa</button>
+                <button onclick="exportData()">💾 Esporta backup</button>
+                <button onclick="importDataClick()">📂 Ripristina backup</button>
             </div>
-            <input type="file" id="importFile" style="display:none" onchange="importData(event)">
+            <button id="scheduleImportBtn" class="schedule-primary" onclick="ScheduleImportUI.open()">📅 Aggiorna piano da CSV</button>
+            <input type="file" id="importFile" accept=".json,application/json" style="display:none" onchange="importData(event)">
         </div>
     </div>
 </div>
 
 <div id="toast" class="toast"></div>
+
+<dialog id="scheduleDialog" aria-labelledby="scheduleTitle" aria-describedby="scheduleIntro">
+    <div class="schedule-heading">
+        <h2 id="scheduleTitle">📅 Aggiorna piano di lavorazione</h2>
+        <button id="scheduleClose" type="button" aria-label="Chiudi importazione CSV">✕</button>
+    </div>
+    <p id="scheduleIntro">Scarica il piano attuale, aprilo in Excel e modifica date e ordine delle righe. Poi salva come CSV e caricalo qui.</p>
+    <button id="scheduleDownload" type="button">⬇️ Scarica piano CSV da compilare</button>
+    <details class="schedule-help">
+        <summary>Come compilare il file</summary>
+        <ul>
+            <li><strong>Scena:</strong> il numero attuale completo, per esempio «sc.46 pt2». Ogni scena compare una sola volta.</li>
+            <li><strong>Data:</strong> ripeti la data su ogni riga, per esempio «16 Ott». Usa «Da programmare» per le scene ancora senza data.</li>
+            <li><strong>Ordine:</strong> disponi le righe nell'ordine di ripresa. Le date seguono la prima comparsa nel CSV; all'interno di ogni data le scene seguono l'ordine delle righe.</li>
+            <li><strong>Nuova scena:</strong> facoltativa, serve per rinumerare una scena esistente. Mantieni il numero vecchio nella colonna Scena.</li>
+            <li>Props, status, note, cast, extras e contenuti della scena vengono conservati. La colonna Set nel modello serve come riferimento.</li>
+            <li>Per nuove scene, aggiungile e salvale prima in Admin. Usa Excel «Salva con nome → CSV UTF-8» oppure esporta un CSV da Google Sheets.</li>
+        </ul>
+    </details>
+    <fieldset id="scheduleFields">
+        <legend>1. Scegli il file e le colonne</legend>
+        <label for="scheduleFile">Piano di lavorazione (.csv o .tsv, massimo 2 MB)</label>
+        <input id="scheduleFile" type="file" accept=".csv,.tsv,text/csv,text/tab-separated-values">
+        <label for="scheduleSeparator">Separatore</label>
+        <select id="scheduleSeparator">
+            <option value="auto">Riconoscimento automatico</option>
+            <option value=";">Punto e virgola (;)</option>
+            <option value=",">Virgola (,)</option>
+            <option value="tab">Tabulazione</option>
+        </select>
+        <div id="scheduleMapping" class="hidden">
+            <div class="schedule-columns">
+                <label>Scena attuale<select id="scheduleSceneColumn"></select></label>
+                <label>Data di ripresa<select id="scheduleDateColumn"></select></label>
+                <label>Nuovo numero (facoltativo)<select id="scheduleRenameColumn"></select></label>
+            </div>
+            <label for="scheduleMissing">Scene assenti dal CSV</label>
+            <select id="scheduleMissing">
+                <option value="keep">Mantieni la data attuale</option>
+                <option value="unscheduled">Sposta in «Da programmare»</option>
+            </select>
+            <p class="schedule-hint">Le scene assenti seguono quelle del CSV nella rispettiva giornata. «Da programmare» resta sempre alla fine.</p>
+        </div>
+    </fieldset>
+    <div id="scheduleErrors" class="schedule-errors hidden" role="alert"></div>
+    <div id="schedulePreview" class="hidden">
+        <h3>2. Controlla il piano risultante</h3>
+        <p id="scheduleSummary" role="status" aria-live="polite"></p>
+        <p class="schedule-hint">Le celle evidenziate indicano le modifiche. Su schermi piccoli puoi scorrere la tabella lateralmente.</p>
+        <div class="schedule-table-wrap" tabindex="0" role="region" aria-label="Anteprima completa del piano">
+            <table>
+                <caption class="schedule-hint">Tutte le scene, nell'ordine risultante</caption>
+                <thead><tr><th scope="col">Posizione</th><th scope="col">Scena</th><th scope="col">Data</th><th scope="col">Provenienza</th></tr></thead>
+                <tbody id="scheduleRows"></tbody>
+            </table>
+        </div>
+    </div>
+    <p id="scheduleStatus" role="status" aria-live="polite"></p>
+    <div class="schedule-actions">
+        <button id="scheduleCancel" type="button">Annulla</button>
+        <button id="scheduleApply" class="schedule-primary" type="button" disabled>💾 Scarica backup e pubblica piano</button>
+    </div>
+    <p class="schedule-hint">Alla conferma scarichi un backup JSON completo e salvi il piano sul sito. Per recuperarlo usa «Ripristina backup» in Admin.</p>
+</dialog>
 
 <script src="config.js"></script>
 <script>
@@ -1258,6 +1324,8 @@
     applyStoredTheme();
     loadData();
 </script>
+<script src="schedule-import.js"></script>
+<script src="schedule-import-ui.js"></script>
 
 </body>
 </html>
