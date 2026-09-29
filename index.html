@@ -410,6 +410,25 @@
         .toast.show { opacity: 1; transform: translate(-50%, 0); }
         .toast.error { background: #991b1b; }
 
+        body.admin-editing { padding-bottom: calc(120px + env(safe-area-inset-bottom)); }
+        body.admin-editing .toast { bottom: calc(110px + env(safe-area-inset-bottom)); }
+        .save-dock {
+            position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+            background: var(--card-bg); color: var(--text-main);
+            border-top: 2px solid var(--border); box-shadow: 0 -4px 18px rgba(0,0,0,.12);
+            padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+            display: flex; align-items: center; justify-content: center; gap: 16px;
+        }
+        .save-dock.has-changes { border-top-color: var(--accent); }
+        .save-dock-status { font-size: 14px; font-weight: 600; }
+        .save-dock-hint { margin-top: 3px; font-size: 12px; color: var(--text-muted); }
+        #saveDockBtn { background: #15803d; color: white; min-height: 44px; flex-shrink: 0; }
+        @media (max-width: 480px) {
+            .save-dock { gap: 10px; padding-left: 12px; padding-right: 12px; }
+            .save-dock-status { font-size: 13px; }
+            .save-dock-hint { display: none; }
+        }
+
         @media (min-width: 720px) {
             #mainContent .scene-card:has(.edit-container:not(.hidden)) { grid-column: 1 / -1; }
             .container { max-width: 960px; }
@@ -469,6 +488,7 @@
         body.dark-mode .scene-card { box-shadow: none; }
         body.dark-mode #searchInput { background: #1e293b; color: var(--text-main); border-color: #334155; }
     </style>
+    <link rel="stylesheet" href="schedule-import.css">
 </head>
 <body>
 
@@ -499,17 +519,89 @@
     <div class="admin-footer">
         <button id="adminToggleBtn" class="admin-toggle-link" onclick="toggleAdmin()">🔒 Admin Mode</button>
         <div id="hiddenAdminControls" class="hidden" style="margin-top: 10px; display: flex; flex-direction: column; gap: 8px;">
-            <div style="display: flex; gap: 6px; justify-content: center;">
+            <div style="display: flex; flex-wrap: wrap; gap: 6px; justify-content: center;">
                 <button onclick="addNewScene()" style="background: var(--primary); color:white;">➕ Aggiungi Scena</button>
-                <button onclick="exportData()">💾 Esporta</button>
-                <button onclick="importDataClick()">📂 Importa</button>
+                <button onclick="exportData()">💾 Esporta backup</button>
+                <button onclick="importDataClick()">📂 Ripristina backup</button>
             </div>
-            <input type="file" id="importFile" style="display:none" onchange="importData(event)">
+            <button id="scheduleImportBtn" class="schedule-primary" onclick="ScheduleImportUI.open()">📅 Aggiorna piano da CSV</button>
+            <input type="file" id="importFile" accept=".json,application/json" style="display:none" onchange="importData(event)">
         </div>
     </div>
 </div>
 
 <div id="toast" class="toast"></div>
+<div id="saveDock" class="save-dock hidden" role="region" aria-label="Salvataggio modifiche">
+    <div>
+        <div id="saveDockStatus" class="save-dock-status" role="status" aria-live="polite">✓ Tutte le modifiche salvate</div>
+        <div class="save-dock-hint">Salva da qui oppure premi Ctrl+Invio / ⌘+Invio</div>
+    </div>
+    <button id="saveDockBtn" type="button" onclick="saveChanges()" disabled>💾 Salva modifiche</button>
+</div>
+
+<dialog id="scheduleDialog" aria-labelledby="scheduleTitle" aria-describedby="scheduleIntro">
+    <div class="schedule-heading">
+        <h2 id="scheduleTitle">📅 Aggiorna piano di lavorazione</h2>
+        <button id="scheduleClose" type="button" aria-label="Chiudi importazione CSV">✕</button>
+    </div>
+    <p id="scheduleIntro">Scarica il piano attuale, aprilo in Excel e modifica date e ordine delle righe. Poi salva come CSV e caricalo qui.</p>
+    <button id="scheduleDownload" type="button">⬇️ Scarica piano CSV da compilare</button>
+    <details class="schedule-help">
+        <summary>Come compilare il file</summary>
+        <ul>
+            <li><strong>Scena:</strong> il numero attuale completo, per esempio «sc.46 pt2». Ogni scena compare una sola volta.</li>
+            <li><strong>Data:</strong> ripeti la data su ogni riga, per esempio «16 Ott». Usa «Da programmare» per le scene ancora senza data.</li>
+            <li><strong>Ordine:</strong> disponi le righe nell'ordine di ripresa. Le date seguono la prima comparsa nel CSV; all'interno di ogni data le scene seguono l'ordine delle righe.</li>
+            <li><strong>Nuova scena:</strong> facoltativa, serve per rinumerare una scena esistente. Mantieni il numero vecchio nella colonna Scena.</li>
+            <li>Props, status, note, cast, extras e contenuti della scena vengono conservati. La colonna Set nel modello serve come riferimento.</li>
+            <li>Per nuove scene, aggiungile e salvale prima in Admin. Usa Excel «Salva con nome → CSV UTF-8» oppure esporta un CSV da Google Sheets.</li>
+        </ul>
+    </details>
+    <fieldset id="scheduleFields">
+        <legend>1. Scegli il file e le colonne</legend>
+        <label for="scheduleFile">Piano di lavorazione (.csv o .tsv, massimo 2 MB)</label>
+        <input id="scheduleFile" type="file" accept=".csv,.tsv,text/csv,text/tab-separated-values">
+        <label for="scheduleSeparator">Separatore</label>
+        <select id="scheduleSeparator">
+            <option value="auto">Riconoscimento automatico</option>
+            <option value=";">Punto e virgola (;)</option>
+            <option value=",">Virgola (,)</option>
+            <option value="tab">Tabulazione</option>
+        </select>
+        <div id="scheduleMapping" class="hidden">
+            <div class="schedule-columns">
+                <label>Scena attuale<select id="scheduleSceneColumn"></select></label>
+                <label>Data di ripresa<select id="scheduleDateColumn"></select></label>
+                <label>Nuovo numero (facoltativo)<select id="scheduleRenameColumn"></select></label>
+            </div>
+            <label for="scheduleMissing">Scene assenti dal CSV</label>
+            <select id="scheduleMissing">
+                <option value="keep">Mantieni la data attuale</option>
+                <option value="unscheduled">Sposta in «Da programmare»</option>
+            </select>
+            <p class="schedule-hint">Le scene assenti seguono quelle del CSV nella rispettiva giornata. «Da programmare» resta sempre alla fine.</p>
+        </div>
+    </fieldset>
+    <div id="scheduleErrors" class="schedule-errors hidden" role="alert"></div>
+    <div id="schedulePreview" class="hidden">
+        <h3>2. Controlla il piano risultante</h3>
+        <p id="scheduleSummary" role="status" aria-live="polite"></p>
+        <p class="schedule-hint">Le celle evidenziate indicano le modifiche. Su schermi piccoli puoi scorrere la tabella lateralmente.</p>
+        <div class="schedule-table-wrap" tabindex="0" role="region" aria-label="Anteprima completa del piano">
+            <table>
+                <caption class="schedule-hint">Tutte le scene, nell'ordine risultante</caption>
+                <thead><tr><th scope="col">Posizione</th><th scope="col">Scena</th><th scope="col">Data</th><th scope="col">Provenienza</th></tr></thead>
+                <tbody id="scheduleRows"></tbody>
+            </table>
+        </div>
+    </div>
+    <p id="scheduleStatus" role="status" aria-live="polite"></p>
+    <div class="schedule-actions">
+        <button id="scheduleCancel" type="button">Annulla</button>
+        <button id="scheduleApply" class="schedule-primary" type="button" disabled>💾 Scarica backup e pubblica piano</button>
+    </div>
+    <p class="schedule-hint">Alla conferma scarichi un backup JSON completo e salvi il piano sul sito. Per recuperarlo usa «Ripristina backup» in Admin.</p>
+</dialog>
 
 <script src="config.js"></script>
 <script>
@@ -569,26 +661,37 @@
     let expandedScenes = new Set();
     let dataVersion = null;
     let isDirty = false;
+    let isSaving = false;
+    let saveFailed = false;
 
     function updateSaveButton() {
         const btn = document.getElementById('saveGlobalBtn');
-        if (!btn || btn.disabled) return;
-        btn.textContent = isDirty ? '💾 Salva tutte le modifiche ●' : '💾 Salva tutte le modifiche';
+        btn.disabled = isSaving;
+        btn.textContent = isSaving ? '💾 Salvataggio…' : isDirty ? '💾 Salva tutte le modifiche ●' : '💾 Salva tutte le modifiche';
         btn.classList.toggle('dirty', isDirty);
+        const dock = document.getElementById('saveDock');
+        dock.classList.toggle('hidden', !isAdmin);
+        dock.classList.toggle('has-changes', isDirty || saveFailed);
+        document.getElementById('saveDockBtn').disabled = isSaving || !isDirty;
+        document.getElementById('saveDockBtn').textContent = isSaving ? '💾 Salvataggio…' : '💾 Salva modifiche';
+        document.getElementById('saveDockStatus').textContent = isSaving ? 'Salvataggio in corso…' : saveFailed
+            ? '⚠️ Modifiche ancora da salvare. Riprova.' : isDirty ? '● Modifiche non salvate' : '✓ Tutte le modifiche salvate';
     }
 
     function markDirty() {
         isDirty = true;
+        saveFailed = false;
         updateSaveButton();
     }
 
     function clearDirty() {
         isDirty = false;
+        saveFailed = false;
         updateSaveButton();
     }
 
     window.addEventListener('beforeunload', (e) => {
-        if (isDirty) {
+        if (isDirty || isSaving) {
             e.preventDefault();
             e.returnValue = '';
         }
@@ -986,6 +1089,7 @@
     }
 
     function toggleAdmin() {
+        if (isSaving) return;
         syncInputsToDb();
         isAdmin = !isAdmin;
         const btn = document.getElementById('adminToggleBtn');
@@ -1003,6 +1107,8 @@
             controls.classList.add('hidden');
             saveGlobal.classList.add('hidden');
         }
+        document.body.classList.toggle('admin-editing', isAdmin);
+        updateSaveButton();
         renderApp();
     }
 
@@ -1144,8 +1250,16 @@
     }
 
     async function saveChanges() {
+        if (!isAdmin || isSaving || document.querySelector('dialog[open]')) return;
         syncInputsToDb();
-        const btn = document.getElementById('saveGlobalBtn');
+        const scrollPosition = { left: window.scrollX, top: window.scrollY };
+        const expandedPositions = dbScenes.map((scene, index) => expandedScenes.has(scene.id) ? index : -1).filter(index => index >= 0);
+        const focused = document.activeElement;
+        const card = focused.closest('.scene-card');
+        const scenePosition = card ? dbScenes.findIndex(scene => String(scene.id) === card.dataset.id) : -1;
+        const fieldClass = [...focused.classList].find(name => /^(input-|prop-.*-input$)/.test(name));
+        const propIndex = focused.closest('.admin-prop-item')?.dataset.propIndex;
+        const selection = typeof focused.selectionStart === 'number' ? [focused.selectionStart, focused.selectionEnd] : null;
 
         let allowEmpty = false;
         if (dbScenes.length === 0) {
@@ -1153,8 +1267,13 @@
             allowEmpty = true;
         }
 
-        btn.textContent = '💾 Salvataggio…';
-        btn.disabled = true;
+        isSaving = true;
+        saveFailed = false;
+        updateSaveButton();
+        // Prevent new edits from being replaced by the response to an earlier save.
+        const locked = [document.querySelector('.app-content'), document.querySelector('.admin-footer')];
+        locked.forEach(node => { node.inert = true; });
+        let savedSuccessfully = false;
         try {
             let saved;
             try {
@@ -1167,22 +1286,44 @@
                     "Annulla = non salvare (le tue modifiche restano sullo schermo, puoi fare un Esporta di backup)"
                 );
                 if (!overwrite) {
+                    saveFailed = true;
                     showToast('Salvataggio annullato: i dati sul server sono più recenti.', true);
                     return;
                 }
                 saved = await sendScenes(dbScenes, { allowEmpty, force: true });
             }
             applySaved(saved.scenes, saved.version);
+            expandedScenes = new Set(expandedPositions.map(index => dbScenes[index]?.id).filter(id => id !== undefined));
+            savedSuccessfully = true;
             showToast('✅ Modifiche salvate e pubblicate.');
         } catch (e) {
+            saveFailed = true;
             console.error(e);
             showToast('⚠️ Salvataggio non riuscito. Riprova.', true);
         } finally {
-            btn.disabled = false;
+            isSaving = false;
+            locked.forEach(node => { node.inert = false; });
             updateSaveButton();
-            renderApp();
+            if (savedSuccessfully) renderApp();
+            if (scenePosition >= 0 && fieldClass) {
+                const scope = document.querySelector(`.scene-card[data-id="${dbScenes[scenePosition]?.id}"]`);
+                const selector = (propIndex !== undefined ? `.admin-prop-item[data-prop-index="${propIndex}"] ` : '') + '.' + fieldClass;
+                const nextField = scope?.querySelector(selector);
+                if (nextField) {
+                    nextField.focus({ preventScroll: true });
+                    if (selection) nextField.setSelectionRange(...selection);
+                }
+            }
+            window.scrollTo(scrollPosition);
         }
     }
+
+    document.addEventListener('keydown', event => {
+        if (event.key === 'Enter' && (event.ctrlKey || event.metaKey) && !event.isComposing && !event.repeat && isAdmin && !document.querySelector('dialog[open]')) {
+            event.preventDefault();
+            if (isDirty) saveChanges();
+        }
+    });
 
     function sendScenes(list, { allowEmpty, force }) {
         return rpc('replace_scenes', {
@@ -1258,6 +1399,8 @@
     applyStoredTheme();
     loadData();
 </script>
+<script src="schedule-import.js"></script>
+<script src="schedule-import-ui.js"></script>
 
 </body>
 </html>
