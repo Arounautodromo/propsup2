@@ -410,6 +410,25 @@
         .toast.show { opacity: 1; transform: translate(-50%, 0); }
         .toast.error { background: #991b1b; }
 
+        body.admin-editing { padding-bottom: calc(120px + env(safe-area-inset-bottom)); }
+        body.admin-editing .toast { bottom: calc(110px + env(safe-area-inset-bottom)); }
+        .save-dock {
+            position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+            background: var(--card-bg); color: var(--text-main);
+            border-top: 2px solid var(--border); box-shadow: 0 -4px 18px rgba(0,0,0,.12);
+            padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+            display: flex; align-items: center; justify-content: center; gap: 16px;
+        }
+        .save-dock.has-changes { border-top-color: var(--accent); }
+        .save-dock-status { font-size: 14px; font-weight: 600; }
+        .save-dock-hint { margin-top: 3px; font-size: 12px; color: var(--text-muted); }
+        #saveDockBtn { background: #15803d; color: white; min-height: 44px; flex-shrink: 0; }
+        @media (max-width: 480px) {
+            .save-dock { gap: 10px; padding-left: 12px; padding-right: 12px; }
+            .save-dock-status { font-size: 13px; }
+            .save-dock-hint { display: none; }
+        }
+
         @media (min-width: 720px) {
             #mainContent .scene-card:has(.edit-container:not(.hidden)) { grid-column: 1 / -1; }
             .container { max-width: 960px; }
@@ -512,6 +531,13 @@
 </div>
 
 <div id="toast" class="toast"></div>
+<div id="saveDock" class="save-dock hidden" role="region" aria-label="Salvataggio modifiche">
+    <div>
+        <div id="saveDockStatus" class="save-dock-status" role="status" aria-live="polite">✓ Tutte le modifiche salvate</div>
+        <div class="save-dock-hint">Salva da qui oppure premi Ctrl+Invio / ⌘+Invio</div>
+    </div>
+    <button id="saveDockBtn" type="button" onclick="saveChanges()" disabled>💾 Salva modifiche</button>
+</div>
 
 <dialog id="scheduleDialog" aria-labelledby="scheduleTitle" aria-describedby="scheduleIntro">
     <div class="schedule-heading">
@@ -635,26 +661,37 @@
     let expandedScenes = new Set();
     let dataVersion = null;
     let isDirty = false;
+    let isSaving = false;
+    let saveFailed = false;
 
     function updateSaveButton() {
         const btn = document.getElementById('saveGlobalBtn');
-        if (!btn || btn.disabled) return;
-        btn.textContent = isDirty ? '💾 Salva tutte le modifiche ●' : '💾 Salva tutte le modifiche';
+        btn.disabled = isSaving;
+        btn.textContent = isSaving ? '💾 Salvataggio…' : isDirty ? '💾 Salva tutte le modifiche ●' : '💾 Salva tutte le modifiche';
         btn.classList.toggle('dirty', isDirty);
+        const dock = document.getElementById('saveDock');
+        dock.classList.toggle('hidden', !isAdmin);
+        dock.classList.toggle('has-changes', isDirty || saveFailed);
+        document.getElementById('saveDockBtn').disabled = isSaving || !isDirty;
+        document.getElementById('saveDockBtn').textContent = isSaving ? '💾 Salvataggio…' : '💾 Salva modifiche';
+        document.getElementById('saveDockStatus').textContent = isSaving ? 'Salvataggio in corso…' : saveFailed
+            ? '⚠️ Modifiche ancora da salvare. Riprova.' : isDirty ? '● Modifiche non salvate' : '✓ Tutte le modifiche salvate';
     }
 
     function markDirty() {
         isDirty = true;
+        saveFailed = false;
         updateSaveButton();
     }
 
     function clearDirty() {
         isDirty = false;
+        saveFailed = false;
         updateSaveButton();
     }
 
     window.addEventListener('beforeunload', (e) => {
-        if (isDirty) {
+        if (isDirty || isSaving) {
             e.preventDefault();
             e.returnValue = '';
         }
@@ -1052,6 +1089,7 @@
     }
 
     function toggleAdmin() {
+        if (isSaving) return;
         syncInputsToDb();
         isAdmin = !isAdmin;
         const btn = document.getElementById('adminToggleBtn');
@@ -1069,6 +1107,8 @@
             controls.classList.add('hidden');
             saveGlobal.classList.add('hidden');
         }
+        document.body.classList.toggle('admin-editing', isAdmin);
+        updateSaveButton();
         renderApp();
     }
 
@@ -1210,8 +1250,16 @@
     }
 
     async function saveChanges() {
+        if (!isAdmin || isSaving || document.querySelector('dialog[open]')) return;
         syncInputsToDb();
-        const btn = document.getElementById('saveGlobalBtn');
+        const scrollPosition = { left: window.scrollX, top: window.scrollY };
+        const expandedPositions = dbScenes.map((scene, index) => expandedScenes.has(scene.id) ? index : -1).filter(index => index >= 0);
+        const focused = document.activeElement;
+        const card = focused.closest('.scene-card');
+        const scenePosition = card ? dbScenes.findIndex(scene => String(scene.id) === card.dataset.id) : -1;
+        const fieldClass = [...focused.classList].find(name => /^(input-|prop-.*-input$)/.test(name));
+        const propIndex = focused.closest('.admin-prop-item')?.dataset.propIndex;
+        const selection = typeof focused.selectionStart === 'number' ? [focused.selectionStart, focused.selectionEnd] : null;
 
         let allowEmpty = false;
         if (dbScenes.length === 0) {
@@ -1219,8 +1267,13 @@
             allowEmpty = true;
         }
 
-        btn.textContent = '💾 Salvataggio…';
-        btn.disabled = true;
+        isSaving = true;
+        saveFailed = false;
+        updateSaveButton();
+        // Prevent new edits from being replaced by the response to an earlier save.
+        const locked = [document.querySelector('.app-content'), document.querySelector('.admin-footer')];
+        locked.forEach(node => { node.inert = true; });
+        let savedSuccessfully = false;
         try {
             let saved;
             try {
@@ -1233,22 +1286,44 @@
                     "Annulla = non salvare (le tue modifiche restano sullo schermo, puoi fare un Esporta di backup)"
                 );
                 if (!overwrite) {
+                    saveFailed = true;
                     showToast('Salvataggio annullato: i dati sul server sono più recenti.', true);
                     return;
                 }
                 saved = await sendScenes(dbScenes, { allowEmpty, force: true });
             }
             applySaved(saved.scenes, saved.version);
+            expandedScenes = new Set(expandedPositions.map(index => dbScenes[index]?.id).filter(id => id !== undefined));
+            savedSuccessfully = true;
             showToast('✅ Modifiche salvate e pubblicate.');
         } catch (e) {
+            saveFailed = true;
             console.error(e);
             showToast('⚠️ Salvataggio non riuscito. Riprova.', true);
         } finally {
-            btn.disabled = false;
+            isSaving = false;
+            locked.forEach(node => { node.inert = false; });
             updateSaveButton();
-            renderApp();
+            if (savedSuccessfully) renderApp();
+            if (scenePosition >= 0 && fieldClass) {
+                const scope = document.querySelector(`.scene-card[data-id="${dbScenes[scenePosition]?.id}"]`);
+                const selector = (propIndex !== undefined ? `.admin-prop-item[data-prop-index="${propIndex}"] ` : '') + '.' + fieldClass;
+                const nextField = scope?.querySelector(selector);
+                if (nextField) {
+                    nextField.focus({ preventScroll: true });
+                    if (selection) nextField.setSelectionRange(...selection);
+                }
+            }
+            window.scrollTo(scrollPosition);
         }
     }
+
+    document.addEventListener('keydown', event => {
+        if (event.key === 'Enter' && (event.ctrlKey || event.metaKey) && !event.isComposing && !event.repeat && isAdmin && !document.querySelector('dialog[open]')) {
+            event.preventDefault();
+            if (isDirty) saveChanges();
+        }
+    });
 
     function sendScenes(list, { allowEmpty, force }) {
         return rpc('replace_scenes', {
