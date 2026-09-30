@@ -26,6 +26,29 @@ test('editing or clearing a note keeps its flag through the existing RPC JSON fi
     assert.equal(review.setNote('Unflagged', 'Edit'), 'Edit');
 });
 
+test('photo metadata stays hidden in scene notes and survives note/flag edits and backups', () => {
+    const photos = [{ path: 'photos/a.webp', name: 'set reference.webp' }];
+    const stored = review.setPhotos(review.toggle('Continuity note'), photos);
+    const restored = JSON.parse(JSON.stringify({ adminNotes: stored })).adminNotes;
+    assert.equal(review.isFlagged(restored), true);
+    assert.equal(review.getNote(restored), 'Continuity note');
+    assert.deepEqual(review.getPhotos(restored), photos);
+
+    const edited = review.setNote(restored, 'Updated scene note');
+    assert.equal(review.isFlagged(edited), true);
+    assert.equal(review.getNote(edited), 'Updated scene note');
+    assert.deepEqual(review.getPhotos(edited), photos);
+
+    const unflagged = review.toggle(edited);
+    assert.equal(review.isFlagged(unflagged), false);
+    assert.equal(review.getNote(unflagged), 'Updated scene note');
+    assert.deepEqual(review.getPhotos(unflagged), photos);
+
+    const cleared = review.setPhotos(unflagged, []);
+    assert.equal(review.getNote(cleared), 'Updated scene note');
+    assert.deepEqual(review.getPhotos(cleared), []);
+});
+
 test('JSON backup and schedule date/number changes preserve flags, notes and props', () => {
     const original = [{id: 1, scena: 'sc.1', data: '16 Ott', adminNotes: review.toggle('Check bouquet'),
         props: [{text: 'Bouquet', status: 'yellow', note: 'Costumes'}]},

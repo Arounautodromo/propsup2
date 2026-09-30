@@ -237,6 +237,16 @@
         .badge.scene-note-toggle { width: 100%; text-align: left; background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
         .badge.scene-note-toggle.has-note { background: #eff6ff; color: #1e40af; border-color: #bfdbfe; }
         .scene-note-input { min-height: 64px; margin-top: 5px; resize: vertical; }
+        .scene-photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 92px)); gap: 7px; margin-top: 8px; }
+        .scene-photo-thumb { display: block; width: 100%; aspect-ratio: 1; overflow: hidden; padding: 0; border: 1px solid var(--border); border-radius: 6px; background: var(--card-bg); }
+        .scene-photo-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
+        .scene-photo-upload { display: inline-flex; align-items: center; gap: 7px; position: relative; overflow: hidden; margin-top: 7px; padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--card-bg); color: var(--primary); font-size: 12px; font-weight: 700; }
+        .scene-photo-upload input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+        .scene-photo-help, .scene-photo-status { display: block; margin-top: 5px; color: var(--text-muted); font-size: 11px; }
+        .scene-photo-viewer { width: min(94vw, 900px); max-width: 94vw; max-height: 92vh; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--card-bg); color: var(--text-main); }
+        .scene-photo-viewer::backdrop { background: rgba(15, 23, 42, .78); }
+        .scene-photo-viewer img { display: block; max-width: 100%; max-height: 78vh; margin: 0 auto; object-fit: contain; }
+        .scene-photo-viewer figcaption { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 8px; font-size: 12px; }
         .badge.extra .extra-entry { display: inline-block; max-width: 100%; vertical-align: baseline; }
         .badge.extra .extra-role { overflow-wrap: anywhere; }
         .badge.extra .extra-count { display: inline-block; padding: 0 1px; border-radius: 4px; background: rgba(255,255,255,.8); color: #14532d; font-size: 1.05em; font-weight: 800; white-space: nowrap; }
@@ -579,6 +589,10 @@
 </div>
 
 <div id="toast" class="toast"></div>
+<dialog id="scenePhotoViewer" class="scene-photo-viewer" aria-label="Foto della scena">
+    <img id="scenePhotoViewerImage" alt="">
+    <figcaption><span id="scenePhotoViewerCaption"></span><button type="button" onclick="closeScenePhoto()" aria-label="Chiudi foto">Chiudi</button></figcaption>
+</dialog>
 <div id="saveDock" class="save-dock hidden" role="region" aria-label="Salvataggio modifiche">
     <span id="saveDockStatus" class="save-dock-status" role="status" aria-live="polite">● Da salvare</span>
     <button id="undoLastSaveBtn" type="button" onclick="undoLastSave()" title="Annulla ultimo salvataggio" aria-label="Annulla ultimo salvataggio" disabled>↶</button>
@@ -1062,6 +1076,7 @@
 
         const expanded = expandedScenes.has(s.id);
         const sceneNote = SceneReview.getNote(s.adminNotes);
+        const scenePhotos = SceneReview.getPhotos(s.adminNotes);
         const editButton = isAdmin ? `<button type="button" class="edit-toggle-btn" onclick="toggleEditor(${s.id})" aria-expanded="${expanded}" title="Note interne e revisione">📝</button>` : '';
 
         return `
@@ -1070,7 +1085,7 @@
                     ${isEditorMode ? `<input type="text" class="inline-scene-control scene-num-input input-scena" data-id="${s.id}" aria-label="Numero scena" value="${escapeHtml(s.scena || '')}">` : `<span class="scene-num">${escapeHtml(s.scena)}</span>`}
                     <div class="scene-actions">
                         ${isEditorMode ? `<input type="text" class="inline-scene-control scene-date-input input-data" data-id="${s.id}" aria-label="Data di ripresa" value="${escapeHtml(s.data || '')}">` : showDateBadge ? `<span class="badge date">📅 ${escapeHtml(s.data)}</span>` : ''}
-                        ${!isAdmin && !isEditorMode && sceneNote.trim() ? `<button type="button" class="scene-note-public-btn" onclick="toggleSceneNote(${s.id})" title="${expandedSceneNotes.has(s.id) ? 'Nascondi nota scena' : 'Mostra nota scena'}" aria-label="${expandedSceneNotes.has(s.id) ? 'Nascondi nota scena' : 'Mostra nota scena'}" aria-expanded="${expandedSceneNotes.has(s.id)}">📝</button>` : ''}
+                        ${!isAdmin && !isEditorMode && (sceneNote.trim() || scenePhotos.length) ? `<button type="button" class="scene-note-public-btn" onclick="toggleSceneNote(${s.id})" title="${expandedSceneNotes.has(s.id) ? 'Nascondi nota e foto' : 'Mostra nota e foto'}" aria-label="${expandedSceneNotes.has(s.id) ? 'Nascondi nota e foto' : 'Mostra nota e foto'}" aria-expanded="${expandedSceneNotes.has(s.id)}">${sceneNote.trim() ? '📝' : '📷'}</button>` : ''}
                         ${isEditorMode ? `<button type="button" class="scene-order-btn" onclick="moveScene(${s.id}, -1)" title="Sposta su" aria-label="Sposta ${escapeHtml(s.scena)} su">↑</button><button type="button" class="scene-order-btn" onclick="moveScene(${s.id}, 1)" title="Sposta giù" aria-label="Sposta ${escapeHtml(s.scena)} giù">↓</button><button type="button" class="scene-delete-btn" onclick="deleteScene(${s.id})" title="Elimina scena" aria-label="Elimina ${escapeHtml(s.scena)}">×</button>` : ''}
                         ${editButton}
                     </div>
@@ -1083,9 +1098,9 @@
                     ${isEditorMode ? `<label class="badge extra"><span>👥 Extras</span><textarea class="inline-scene-control input-extras autogrow" data-id="${s.id}" data-original-value="${escapeHtml(extrasEditorValue)}" aria-label="Extras">${escapeHtml(extrasEditorValue)}</textarea></label>` : s.extras ? `<span class="badge extra">👥 Extras: ${renderExtrasHTML(s.extras)}</span>` : ''}
                 </div>
 
-                ${!isAdmin && !isEditorMode && expandedSceneNotes.has(s.id) && sceneNote.trim() ? `<div class="scene-note-public"><strong>📝 Nota scena</strong><div>${escapeHtml(sceneNote)}</div></div>` : ''}
+                ${!isAdmin && !isEditorMode && expandedSceneNotes.has(s.id) && (sceneNote.trim() || scenePhotos.length) ? `<div class="scene-note-public">${sceneNote.trim() ? `<strong>📝 Nota scena</strong><div>${escapeHtml(sceneNote)}</div>` : ''}${scenePhotos.length ? `<div class="scene-photo-grid">${scenePhotos.map((photo, index) => `<button type="button" class="scene-photo-thumb" onclick="openScenePhoto(${s.id}, ${index})" aria-label="Apri foto: ${escapeHtml(photo.name || 'foto scena')}"><img src="${escapeHtml(scenePhotoUrl(photo.path))}" alt="${escapeHtml(photo.name || 'Foto scena')}" loading="lazy"></button>`).join('')}</div>` : ''}</div>` : ''}
 
-                ${isEditorMode ? `<div class="scene-note-field"><button type="button" class="badge scene-note-toggle ${SceneReview.getNote(s.adminNotes).trim() ? 'has-note' : ''}" onclick="toggleSceneNote(${s.id})" aria-expanded="${expandedSceneNotes.has(s.id)}">${SceneReview.getNote(s.adminNotes).trim() ? '📝 Nota scena' : '＋ Nota scena'}</button>${expandedSceneNotes.has(s.id) ? `<textarea class="inline-scene-control input-adminnotes scene-note-input autogrow" data-id="${s.id}" aria-label="Nota generale della scena" placeholder="Note per tutta la scena...">${escapeHtml(SceneReview.getNote(s.adminNotes))}</textarea>` : ''}</div>` : ''}
+                ${isEditorMode ? `<div class="scene-note-field"><button type="button" class="badge scene-note-toggle ${sceneNote.trim() || scenePhotos.length ? 'has-note' : ''}" onclick="toggleSceneNote(${s.id})" aria-expanded="${expandedSceneNotes.has(s.id)}">${sceneNote.trim() || scenePhotos.length ? `📝 Nota scena${scenePhotos.length ? ` · ${scenePhotos.length} foto` : ''}` : '＋ Nota scena'}</button>${expandedSceneNotes.has(s.id) ? `<textarea class="inline-scene-control input-adminnotes scene-note-input autogrow" data-id="${s.id}" aria-label="Nota generale della scena" placeholder="Note per tutta la scena...">${escapeHtml(sceneNote)}</textarea><label class="scene-photo-upload">📷 Carica foto<input type="file" accept="image/jpeg,image/png,image/webp" multiple aria-label="Carica foto scena" onchange="uploadScenePhotos(${s.id}, this.files)"></label><span class="scene-photo-help">JPEG, PNG o WebP · max 8 MB per foto</span><span class="scene-photo-status" id="scene-photo-status-${s.id}" role="status" aria-live="polite"></span>${scenePhotos.length ? `<div class="scene-photo-grid">${scenePhotos.map((photo, index) => `<button type="button" class="scene-photo-thumb" onclick="openScenePhoto(${s.id}, ${index})" aria-label="Apri foto: ${escapeHtml(photo.name || 'foto scena')}"><img src="${escapeHtml(scenePhotoUrl(photo.path))}" alt="${escapeHtml(photo.name || 'Foto scena')}" loading="lazy"></button>`).join('')}</div>` : ''}` : ''}</div>` : ''}
 
                 ${publicPropsHTML}
 
@@ -1261,6 +1276,87 @@
         }
         updateSaveButton();
         renderAppPreservingScroll();
+    }
+
+    const SCENE_PHOTO_BUCKET = 'scene-photos';
+    const MAX_SCENE_PHOTO_BYTES = 8 * 1024 * 1024;
+
+    function scenePhotoUrl(path) {
+        const encodedPath = String(path || '').split('/').map(encodeURIComponent).join('/');
+        return `${SUPABASE_URL}/storage/v1/object/public/${SCENE_PHOTO_BUCKET}/${encodedPath}`;
+    }
+
+    function openScenePhoto(sceneId, photoIndex) {
+        const scene = dbScenes.find(item => item.id === sceneId);
+        const photo = SceneReview.getPhotos(scene?.adminNotes)[photoIndex];
+        if (!photo) return;
+        document.getElementById('scenePhotoViewerImage').src = scenePhotoUrl(photo.path);
+        document.getElementById('scenePhotoViewerImage').alt = photo.name || 'Foto scena';
+        document.getElementById('scenePhotoViewerCaption').textContent = photo.name || scene.scena;
+        document.getElementById('scenePhotoViewer').showModal();
+    }
+
+    function closeScenePhoto() {
+        const viewer = document.getElementById('scenePhotoViewer');
+        viewer.close();
+        document.getElementById('scenePhotoViewerImage').removeAttribute('src');
+    }
+
+    async function compressScenePhoto(file) {
+        if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) throw new Error('Usa una foto JPEG, PNG o WebP.');
+        if (file.size > MAX_SCENE_PHOTO_BYTES) throw new Error('La foto supera il limite di 8 MB.');
+        const bitmap = await createImageBitmap(file);
+        const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+        canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+        canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+        bitmap.close();
+        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/webp', .82));
+        if (!blob) throw new Error('Non riesco a preparare questa foto.');
+        const baseName = file.name.replace(/\.[^.]+$/, '') || 'foto-scena';
+        return { blob, name: baseName + (blob.type === 'image/webp' ? '.webp' : '.jpg') };
+    }
+
+    async function uploadScenePhotos(sceneId, fileList) {
+        if (!isEditorMode || isSaving) return;
+        const files = [...(fileList || [])];
+        if (!files.length) return;
+        syncInputsToDb();
+        const scene = dbScenes.find(item => item.id === sceneId);
+        if (!scene) return;
+        const status = document.getElementById(`scene-photo-status-${sceneId}`);
+        const authHeaders = { apikey: SUPABASE_ANON_KEY };
+        if (SUPABASE_ANON_KEY.startsWith('eyJ')) authHeaders.Authorization = 'Bearer ' + SUPABASE_ANON_KEY;
+        let uploaded = 0;
+        try {
+            for (const [index, file] of files.entries()) {
+                if (status) status.textContent = `Caricamento ${index + 1} di ${files.length}…`;
+                const { blob, name } = await compressScenePhoto(file);
+                const randomName = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
+                const path = randomName + (blob.type === 'image/webp' ? '.webp' : '.jpg');
+                const response = await fetch(`${SUPABASE_URL}/storage/v1/object/${SCENE_PHOTO_BUCKET}/${encodeURIComponent(path)}`, {
+                    method: 'POST',
+                    headers: { ...authHeaders, 'Content-Type': blob.type || file.type, 'x-upsert': 'false' },
+                    body: blob
+                });
+                if (!response.ok) {
+                    const details = await response.text();
+                    throw new Error(details || `HTTP ${response.status}`);
+                }
+                scene.adminNotes = SceneReview.setPhotos(scene.adminNotes, [
+                    ...SceneReview.getPhotos(scene.adminNotes), { path, name }
+                ]);
+                uploaded++;
+                markDirty();
+            }
+            renderAppPreservingScroll();
+            showToast(`📷 ${uploaded} ${uploaded === 1 ? 'foto caricata' : 'foto caricate'}. Premi Salva per associarle alla scena.`);
+        } catch (error) {
+            console.error(error);
+            if (uploaded) renderAppPreservingScroll();
+            showToast('⚠️ Upload non riuscito. Verifica il bucket Supabase e riprova.', true);
+        }
     }
 
     function toggleSceneNote(sceneId) {
