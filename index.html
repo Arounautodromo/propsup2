@@ -461,7 +461,9 @@
             display: flex; align-items: center; gap: 10px;
         }
         .save-dock.has-changes { border-color: var(--accent); }
-        .save-dock-status { font-size: 12px; font-weight: 700; line-height: 1.2; }
+        .save-dock-status { flex: 1; min-width: 0; font-size: 12px; font-weight: 700; line-height: 1.2; }
+        #undoLastSaveBtn { width: 38px; min-height: 38px; padding: 0; background: #f1f5f9; color: #334155; font-size: 20px; flex-shrink: 0; }
+        #undoLastSaveBtn:disabled { opacity: .42; }
         #saveDockBtn { background: #15803d; color: white; min-height: 38px; flex-shrink: 0; }
         @media (max-width: 480px) {
             .save-dock { bottom: calc(8px + env(safe-area-inset-bottom)); right: 8px; max-width: calc(100vw - 16px); }
@@ -573,6 +575,7 @@
 <div id="toast" class="toast"></div>
 <div id="saveDock" class="save-dock hidden" role="region" aria-label="Salvataggio modifiche">
     <span id="saveDockStatus" class="save-dock-status" role="status" aria-live="polite">● Da salvare</span>
+    <button id="undoLastSaveBtn" type="button" onclick="undoLastSave()" title="Annulla ultimo salvataggio" aria-label="Annulla ultimo salvataggio" disabled>↶</button>
     <button id="saveDockBtn" type="button" onclick="saveChanges()" title="Salva anche con Ctrl+Invio o ⌘+Invio" disabled>💾 Salva</button>
 </div>
 
@@ -661,10 +664,26 @@
 
     const THEME_KEY = 'upgraded_props_theme';
     const UNSCHEDULED_DAY = 'Da programmare';
+    const SHOOT_MONTH_ORDER = { gen: 0, feb: 1, mar: 2, apr: 3, mag: 4, giu: 5, lug: 6, ago: 7, set: 8, ott: 9, nov: 10, dic: 11 };
+
+    function shootingDateOrder(value) {
+        const match = String(value || '').trim().toLocaleLowerCase().match(/^(\d{1,2})\s+([a-zà-ÿ]+)/i);
+        if (!match) return null;
+        const month = match[2].normalize('NFD').replace(/[\u0300-\u036f]/g, '').slice(0, 3);
+        const monthOrder = SHOOT_MONTH_ORDER[month];
+        return monthOrder === undefined ? null : monthOrder * 32 + Number(match[1]);
+    }
 
     function getAvailableDays() {
         const days = [...new Set(dbScenes.map(s => s.data))];
-        return days.filter(day => day !== UNSCHEDULED_DAY)
+        const scheduled = days.filter(day => day !== UNSCHEDULED_DAY);
+        return scheduled.map((day, index) => ({ day, index, order: shootingDateOrder(day) }))
+            .sort((a, b) => {
+                if (a.order === null && b.order === null) return a.index - b.index;
+                if (a.order === null) return 1;
+                if (b.order === null) return -1;
+                return a.order - b.order || a.index - b.index;
+            }).map(item => item.day)
             .concat(days.includes(UNSCHEDULED_DAY) ? [UNSCHEDULED_DAY] : []);
     }
 
@@ -702,6 +721,8 @@
     let isDirty = false;
     let isSaving = false;
     let saveFailed = false;
+    let lastSavedSnapshot = null;
+    let isUndoingSave = false;
 
     function updateSaveButton() {
         const btn = document.getElementById('saveGlobalBtn');
@@ -709,10 +730,11 @@
         btn.textContent = isSaving ? '💾 Salvataggio…' : isDirty ? '💾 Salva tutte le modifiche ●' : '💾 Salva tutte le modifiche';
         btn.classList.toggle('dirty', isDirty);
         const dock = document.getElementById('saveDock');
-        const showDock = isEditorMode || isDirty || isSaving || saveFailed;
+        const showDock = isEditorMode || isDirty || isSaving || saveFailed || !!lastSavedSnapshot;
         dock.classList.toggle('hidden', !showDock);
         document.body.classList.toggle('save-dock-visible', showDock);
         dock.classList.toggle('has-changes', isDirty || saveFailed);
+        document.getElementById('undoLastSaveBtn').disabled = isSaving || isDirty || !lastSavedSnapshot;
         document.getElementById('saveDockBtn').disabled = isSaving || !isDirty;
         document.getElementById('saveDockBtn').textContent = isSaving ? 'Salvataggio…' : '💾 Salva';
         document.getElementById('saveDockStatus').textContent = isSaving ? 'Salvataggio in corso…' : saveFailed
@@ -1366,6 +1388,7 @@
 
     async function saveChanges() {
         if ((!isAdmin && !isEditorMode && !isDirty) || isSaving || document.querySelector('dialog[open]')) return;
+        const previousScenes = isUndoingSave ? null : JSON.parse(JSON.stringify(dbScenes));
         syncInputsToDb();
         const scrollPosition = { left: window.scrollX, top: window.scrollY };
         const expandedPositions = dbScenes.map((scene, index) => expandedScenes.has(scene.id) ? index : -1).filter(index => index >= 0);
@@ -1408,6 +1431,7 @@
                 saved = await sendScenes(dbScenes, { allowEmpty, force: true });
             }
             applySaved(saved.scenes, saved.version);
+            lastSavedSnapshot = isUndoingSave ? null : previousScenes;
             expandedScenes = new Set(expandedPositions.map(index => dbScenes[index]?.id).filter(id => id !== undefined));
             savedSuccessfully = true;
             showToast('✅ Modifiche salvate e pubblicate.');
@@ -1431,6 +1455,22 @@
             }
             window.scrollTo(scrollPosition);
         }
+    }
+
+    async function undoLastSave() {
+        if (!lastSavedSnapshot || isDirty || isSaving) return;
+        const previousScenes = JSON.parse(JSON.stringify(lastSavedSnapshot));
+        const expandedNumbers = new Set([...expandedScenes]
+            .map(id => dbScenes.find(scene => scene.id === id)?.scena).filter(Boolean));
+        dbScenes = previousScenes;
+        expandedScenes = new Set(dbScenes.filter(scene => expandedNumbers.has(scene.scena)).map(scene => scene.id));
+        isUndoingSave = true;
+        markDirty();
+        renderAppPreservingScroll();
+        await saveChanges();
+        isUndoingSave = false;
+        updateSaveButton();
+        if (!isDirty && !lastSavedSnapshot) showToast('↶ Ultimo salvataggio annullato.');
     }
 
     document.addEventListener('keydown', event => {
