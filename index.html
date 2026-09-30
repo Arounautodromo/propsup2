@@ -240,6 +240,9 @@
         .scene-photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 92px)); gap: 7px; margin-top: 8px; }
         .scene-photo-thumb { display: block; width: 100%; aspect-ratio: 1; overflow: hidden; padding: 0; border: 1px solid var(--border); border-radius: 6px; background: var(--card-bg); }
         .scene-photo-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
+        .scene-photo-item { position: relative; }
+        .scene-photo-delete { position: absolute; top: -6px; right: -6px; width: 22px; height: 22px; padding: 0; border-radius: 999px; background: #dc2626; color: #fff; border: 2px solid var(--card-bg); font-size: 13px; line-height: 1; font-weight: 800; box-shadow: 0 1px 3px rgba(0,0,0,.3); }
+        .scene-photo-delete:hover { background: #991b1b; }
         .scene-photo-upload { display: inline-flex; align-items: center; gap: 7px; position: relative; overflow: hidden; margin-top: 7px; padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--card-bg); color: var(--primary); font-size: 12px; font-weight: 700; }
         .scene-photo-upload input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
         .scene-photo-help, .scene-photo-status { display: block; margin-top: 5px; color: var(--text-muted); font-size: 11px; }
@@ -1100,7 +1103,7 @@
 
                 ${!isAdmin && !isEditorMode && expandedSceneNotes.has(s.id) && (sceneNote.trim() || scenePhotos.length) ? `<div class="scene-note-public">${sceneNote.trim() ? `<strong>📝 Nota scena</strong><div>${escapeHtml(sceneNote)}</div>` : ''}${scenePhotos.length ? `<div class="scene-photo-grid">${scenePhotos.map((photo, index) => `<button type="button" class="scene-photo-thumb" onclick="openScenePhoto(${s.id}, ${index})" aria-label="Apri foto: ${escapeHtml(photo.name || 'foto scena')}"><img src="${escapeHtml(scenePhotoUrl(photo.path))}" alt="${escapeHtml(photo.name || 'Foto scena')}" loading="lazy"></button>`).join('')}</div>` : ''}</div>` : ''}
 
-                ${isEditorMode ? `<div class="scene-note-field"><button type="button" class="badge scene-note-toggle ${sceneNote.trim() || scenePhotos.length ? 'has-note' : ''}" onclick="toggleSceneNote(${s.id})" aria-expanded="${expandedSceneNotes.has(s.id)}">${sceneNote.trim() || scenePhotos.length ? `📝 Nota scena${scenePhotos.length ? ` · ${scenePhotos.length} foto` : ''}` : '＋ Nota scena'}</button>${expandedSceneNotes.has(s.id) ? `<textarea class="inline-scene-control input-adminnotes scene-note-input autogrow" data-id="${s.id}" aria-label="Nota generale della scena" placeholder="Note per tutta la scena...">${escapeHtml(sceneNote)}</textarea><label class="scene-photo-upload">📷 Carica foto<input type="file" accept="image/jpeg,image/png,image/webp" multiple aria-label="Carica foto scena" onchange="uploadScenePhotos(${s.id}, this.files)"></label><span class="scene-photo-help">JPEG, PNG o WebP · max 8 MB per foto</span><span class="scene-photo-status" id="scene-photo-status-${s.id}" role="status" aria-live="polite"></span>${scenePhotos.length ? `<div class="scene-photo-grid">${scenePhotos.map((photo, index) => `<button type="button" class="scene-photo-thumb" onclick="openScenePhoto(${s.id}, ${index})" aria-label="Apri foto: ${escapeHtml(photo.name || 'foto scena')}"><img src="${escapeHtml(scenePhotoUrl(photo.path))}" alt="${escapeHtml(photo.name || 'Foto scena')}" loading="lazy"></button>`).join('')}</div>` : ''}` : ''}</div>` : ''}
+                ${isEditorMode ? `<div class="scene-note-field"><button type="button" class="badge scene-note-toggle ${sceneNote.trim() || scenePhotos.length ? 'has-note' : ''}" onclick="toggleSceneNote(${s.id})" aria-expanded="${expandedSceneNotes.has(s.id)}">${sceneNote.trim() || scenePhotos.length ? `📝 Nota scena${scenePhotos.length ? ` · ${scenePhotos.length} foto` : ''}` : '＋ Nota scena'}</button>${expandedSceneNotes.has(s.id) ? `<textarea class="inline-scene-control input-adminnotes scene-note-input autogrow" data-id="${s.id}" aria-label="Nota generale della scena" placeholder="Note per tutta la scena...">${escapeHtml(sceneNote)}</textarea><label class="scene-photo-upload">📷 Carica foto<input type="file" accept="image/jpeg,image/png,image/webp" multiple aria-label="Carica foto scena" onchange="uploadScenePhotos(${s.id}, this.files)"></label><span class="scene-photo-help">JPEG, PNG o WebP · max 8 MB per foto</span><span class="scene-photo-status" id="scene-photo-status-${s.id}" role="status" aria-live="polite"></span>${scenePhotos.length ? `<div class="scene-photo-grid">${scenePhotos.map((photo, index) => `<div class="scene-photo-item"><button type="button" class="scene-photo-thumb" onclick="openScenePhoto(${s.id}, ${index})" aria-label="Apri foto: ${escapeHtml(photo.name || 'foto scena')}"><img src="${escapeHtml(scenePhotoUrl(photo.path))}" alt="${escapeHtml(photo.name || 'Foto scena')}" loading="lazy"></button><button type="button" class="scene-photo-delete" onclick="event.stopPropagation(); deleteScenePhoto(${s.id}, ${index})" aria-label="Elimina foto: ${escapeHtml(photo.name || 'foto scena')}" title="Elimina foto">×</button></div>`).join('')}</div>` : ''}` : ''}</div>` : ''}
 
                 ${publicPropsHTML}
 
@@ -1356,6 +1359,34 @@
             console.error(error);
             if (uploaded) renderAppPreservingScroll();
             showToast('⚠️ Upload non riuscito. Verifica il bucket Supabase e riprova.', true);
+        }
+    }
+
+    async function deleteScenePhoto(sceneId, photoIndex) {
+        if (!isEditorMode || isSaving) return;
+        syncInputsToDb();
+        const scene = dbScenes.find(item => item.id === sceneId);
+        if (!scene) return;
+        const photos = SceneReview.getPhotos(scene.adminNotes);
+        const photo = photos[photoIndex];
+        if (!photo) return;
+        if (!confirm(`Eliminare la foto "${photo.name || 'foto scena'}"? L'operazione non si può annullare dopo il salvataggio.`)) return;
+
+        scene.adminNotes = SceneReview.setPhotos(scene.adminNotes, photos.filter((_, i) => i !== photoIndex));
+        markDirty();
+        renderAppPreservingScroll();
+
+        try {
+            const authHeaders = { apikey: SUPABASE_ANON_KEY };
+            if (SUPABASE_ANON_KEY.startsWith('eyJ')) authHeaders.Authorization = 'Bearer ' + SUPABASE_ANON_KEY;
+            const response = await fetch(`${SUPABASE_URL}/storage/v1/object/${SCENE_PHOTO_BUCKET}/${encodeURIComponent(photo.path)}`, {
+                method: 'DELETE',
+                headers: authHeaders
+            });
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+        } catch (error) {
+            console.error(error);
+            showToast('Foto rimossa dalla scena. Il file resterà nello storage: puoi ignorarlo.', true);
         }
     }
 
