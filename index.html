@@ -843,6 +843,31 @@
         return hay.join(' \n ').toLowerCase().includes(q);
     }
 
+    function searchScenes(scenes, q) {
+        const query = q.trim().toLowerCase();
+        const number = query.match(/^(?:sc\s*\.?\s*)?(\d+)$/)?.[1];
+        if (!number) return scenes.filter(s => matchesSearch(s, query));
+
+        // Numeric queries rank scene labels first, retaining all full-text matches.
+        return scenes.map((scene, index) => {
+            const label = (scene.scena || '').trim().match(/^(?:sc\s*\.?\s*)?(\d+)(.*)$/i);
+            let rank = 3;
+            let part = 0;
+            if (label) {
+                const suffix = label[2].trim();
+                const subpart = suffix.match(/^pt\s*(\d+)$/i);
+                if (label[1] === number && !suffix) rank = 0;
+                else if (label[1] === number && subpart) {
+                    rank = 1;
+                    part = Number(subpart[1]);
+                } else if (label[1].startsWith(number)) rank = 2;
+            }
+            return { scene, index, rank, part };
+        }).filter(item => item.rank < 3 || matchesSearch(item.scene, query) || matchesSearch(item.scene, number))
+            .sort((a, b) => a.rank - b.rank || a.part - b.part || a.index - b.index)
+            .map(item => item.scene);
+    }
+
     function countPendingProps() {
         let n = 0;
         dbScenes.forEach(s => (s.props || []).forEach(p => {
@@ -929,7 +954,7 @@
         let headerSubtitle = '';
 
         if (searchQuery) {
-            filtered = dbScenes.filter(s => matchesSearch(s, searchQuery));
+            filtered = searchScenes(dbScenes, searchQuery);
             headerTitle = `Risultati per &quot;${escapeHtml(searchQuery)}&quot;`;
             headerSubtitle = `${filtered.length} scena/e trovate su tutte le date`;
         } else {
@@ -1145,7 +1170,7 @@
     function renderReviewScenesHTML() {
         if (!isAdmin) return '';
         const flagged = dbScenes.filter(s => SceneReview.isFlagged(s.adminNotes));
-        const scenes = flagged.filter(s => matchesSearch(s, searchQuery));
+        const scenes = searchScenes(flagged, searchQuery);
         return `<div class="day-header"><div>
             <h2>🚩 Scene da rivedere</h2>
             <div class="day-summary">${scenes.length} di ${flagged.length} scene segnalate · Tutte le date · Seleziona una scena per aprirla</div>
