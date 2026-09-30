@@ -996,6 +996,35 @@
         return html;
     }
 
+    // Cast IDs from the supplied breakdown; aliases cover existing prop labels.
+    const PROP_CAST_ORDER = [
+        ['Ana', 'Ana Santos'], ['Antonio', 'Antonio Cruz'], ['Elena', 'Elena Moreau'],
+        ['Claire', 'Claire Dupont'], ['Suzette'], ['Raphael', 'Raphael Castillo'],
+        ['Patrick', 'Patrick Onassis'], ['Javier'], ['David'], ['Giacomo'], ['Ronnie'], ['Viv'],
+        ['Dr Mustafa Kamal', 'Dr Kamal', 'Mustafa Kamal'], ['Priest'], ['Marcus', 'Marcus Webb', 'Marcus Web'],
+        ['Amy'], ['Nonni'], ['Astrid'], ['Maria'], ['Attendant', 'Attendant (JFK desk)'],
+        ['Violetta'], ['Reporter'], ['Spanish Suit'], ['Brat'], ['News Anchor SC 8'], ['Pierre'],
+        ['NZ Curator'], ['Reporter #1', 'Reporter #1 Reporter #2'], ['Reporter #2'], ['Biennale Press'],
+        ['Stunt Coordinator']
+    ];
+    const normalizePropCharacter = name => name.toLowerCase().replace(/\./g, '').trim().replace(/\s+/g, ' ');
+    const PROP_CAST_RANK = new Map(PROP_CAST_ORDER.flatMap((aliases, rank) =>
+        aliases.map(name => [normalizePropCharacter(name), rank])));
+
+    function propCharacterRank(character) {
+        const name = normalizePropCharacter(character);
+        if (name === 'background' || name === 'backgorund') return 1001;
+        // Shared groups follow the first billed member without splitting their props.
+        return Math.min(...name.split(',').map(member => PROP_CAST_RANK.get(member.trim()) ?? 1000));
+    }
+
+    function propEditorRank(prop) {
+        const text = String(prop.text || '').trim();
+        if (!text) return -1; // New fields stay directly below the add button.
+        const separator = text.indexOf(':');
+        return propCharacterRank(separator > 0 ? text.slice(0, separator) : '');
+    }
+
     function renderGroupedProps(props) {
         const formatCharacter = value => value.trim()
             .replace(/\s*,\s*/g, ', ')
@@ -1013,9 +1042,8 @@
             if (!groups.has(key)) groups.set(key, { character, items: [] });
             groups.get(key).items.push(name);
         });
-        const orderedGroups = [...groups.values()];
-        const backgroundIndex = orderedGroups.findIndex(group => group.character.toLocaleLowerCase() === 'background');
-        if (backgroundIndex >= 0) orderedGroups.push(...orderedGroups.splice(backgroundIndex, 1));
+        const orderedGroups = [...groups.values()]
+            .sort((a, b) => propCharacterRank(a.character) - propCharacterRank(b.character));
         return orderedGroups.map(group => `
             <div class="prop-group prop-item-public">
                 ${group.character ? `<strong class="prop-group-name">${escapeHtml(formatCharacter(group.character))}</strong>` : ''}
@@ -1059,11 +1087,7 @@
         let adminPropsHTML = "";
         if (propsList.length > 0) {
             const editableProps = propsList.map((prop, propIndex) => ({ prop, propIndex }))
-                .sort((a, b) => {
-                    const aBackground = /^background\s*:/i.test(a.prop.text || '');
-                    const bBackground = /^background\s*:/i.test(b.prop.text || '');
-                    return Number(aBackground) - Number(bBackground) || a.propIndex - b.propIndex;
-                });
+                .sort((a, b) => propEditorRank(a.prop) - propEditorRank(b.prop) || a.propIndex - b.propIndex);
             adminPropsHTML = editableProps.map(({ prop: p, propIndex: pIdx }) => {
                 const rSel = p.status === 'red' ? 'selected' : '';
                 const ySel = p.status === 'yellow' ? 'selected' : '';
@@ -1483,6 +1507,11 @@
             scene.props.push({ text: "", status: "red", note: "" });
             markDirty();
             renderAppPreservingScroll();
+            requestAnimationFrame(() => {
+                const input = document.querySelector(`.admin-props-container[data-id="${sceneId}"] .admin-prop-item[data-prop-index="${scene.props.length - 1}"] .prop-text-input`);
+                input?.focus({ preventScroll: true });
+                input?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+            });
         }
     }
 
