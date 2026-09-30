@@ -221,6 +221,9 @@
         .scene-order-btn, .scene-delete-btn { min-width: 32px; height: 32px; padding: 0 7px; border-radius: 6px; }
         .scene-order-btn { background: #f1f5f9; color: var(--text-main); }
         .scene-delete-btn { background: #fee2e2; color: #991b1b; }
+        .scene-note-public-btn { width: 30px; height: 30px; padding: 0; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--text-muted); font-size: 15px; }
+        .scene-note-public-btn[aria-expanded="true"] { background: var(--primary-light); color: var(--primary); border-color: var(--border); }
+        .scene-note-public { margin: 0 0 10px; padding: 8px 10px; border-left: 3px solid var(--primary); border-radius: 0 5px 5px 0; background: var(--primary-light); color: var(--text-main); font-size: 13px; line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; }
 
         .badges-top { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
         .badge {
@@ -1058,6 +1061,7 @@
         }
 
         const expanded = expandedScenes.has(s.id);
+        const sceneNote = SceneReview.getNote(s.adminNotes);
         const editButton = isAdmin ? `<button type="button" class="edit-toggle-btn" onclick="toggleEditor(${s.id})" aria-expanded="${expanded}" title="Note interne e revisione">📝</button>` : '';
 
         return `
@@ -1066,6 +1070,7 @@
                     ${isEditorMode ? `<input type="text" class="inline-scene-control scene-num-input input-scena" data-id="${s.id}" aria-label="Numero scena" value="${escapeHtml(s.scena || '')}">` : `<span class="scene-num">${escapeHtml(s.scena)}</span>`}
                     <div class="scene-actions">
                         ${isEditorMode ? `<input type="text" class="inline-scene-control scene-date-input input-data" data-id="${s.id}" aria-label="Data di ripresa" value="${escapeHtml(s.data || '')}">` : showDateBadge ? `<span class="badge date">📅 ${escapeHtml(s.data)}</span>` : ''}
+                        ${!isAdmin && !isEditorMode && sceneNote.trim() ? `<button type="button" class="scene-note-public-btn" onclick="toggleSceneNote(${s.id})" title="${expandedSceneNotes.has(s.id) ? 'Nascondi nota scena' : 'Mostra nota scena'}" aria-label="${expandedSceneNotes.has(s.id) ? 'Nascondi nota scena' : 'Mostra nota scena'}" aria-expanded="${expandedSceneNotes.has(s.id)}">📝</button>` : ''}
                         ${isEditorMode ? `<button type="button" class="scene-order-btn" onclick="moveScene(${s.id}, -1)" title="Sposta su" aria-label="Sposta ${escapeHtml(s.scena)} su">↑</button><button type="button" class="scene-order-btn" onclick="moveScene(${s.id}, 1)" title="Sposta giù" aria-label="Sposta ${escapeHtml(s.scena)} giù">↓</button><button type="button" class="scene-delete-btn" onclick="deleteScene(${s.id})" title="Elimina scena" aria-label="Elimina ${escapeHtml(s.scena)}">×</button>` : ''}
                         ${editButton}
                     </div>
@@ -1077,6 +1082,8 @@
                     ${isEditorMode ? `<label class="badge cast"><span>🎭 Cast</span><input type="text" class="inline-scene-control input-cast" data-id="${s.id}" aria-label="Cast" value="${escapeHtml(s.cast || '')}"></label>` : s.cast ? `<span class="badge cast">🎭 Cast: ${escapeHtml(s.cast)}</span>` : ''}
                     ${isEditorMode ? `<label class="badge extra"><span>👥 Extras</span><textarea class="inline-scene-control input-extras autogrow" data-id="${s.id}" data-original-value="${escapeHtml(extrasEditorValue)}" aria-label="Extras">${escapeHtml(extrasEditorValue)}</textarea></label>` : s.extras ? `<span class="badge extra">👥 Extras: ${renderExtrasHTML(s.extras)}</span>` : ''}
                 </div>
+
+                ${!isAdmin && !isEditorMode && expandedSceneNotes.has(s.id) && sceneNote.trim() ? `<div class="scene-note-public"><strong>📝 Nota scena</strong><div>${escapeHtml(sceneNote)}</div></div>` : ''}
 
                 ${isEditorMode ? `<div class="scene-note-field"><button type="button" class="badge scene-note-toggle ${SceneReview.getNote(s.adminNotes).trim() ? 'has-note' : ''}" onclick="toggleSceneNote(${s.id})" aria-expanded="${expandedSceneNotes.has(s.id)}">${SceneReview.getNote(s.adminNotes).trim() ? '📝 Nota scena' : '＋ Nota scena'}</button>${expandedSceneNotes.has(s.id) ? `<textarea class="inline-scene-control input-adminnotes scene-note-input autogrow" data-id="${s.id}" aria-label="Nota generale della scena" placeholder="Note per tutta la scena...">${escapeHtml(SceneReview.getNote(s.adminNotes))}</textarea>` : ''}</div>` : ''}
 
@@ -1257,7 +1264,7 @@
     }
 
     function toggleSceneNote(sceneId) {
-        if (!isEditorMode || isSaving) return;
+        if ((isAdmin && !isEditorMode) || isSaving) return;
         syncInputsToDb();
         if (expandedSceneNotes.has(sceneId)) expandedSceneNotes.delete(sceneId);
         else expandedSceneNotes.add(sceneId);
