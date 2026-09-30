@@ -90,6 +90,10 @@
             font-size: 18px;
             padding: 4px 8px;
         }
+        .day-header-copy { min-width: 0; }
+        .day-header-controls { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+        .day-editor-toggle { width: 32px; height: 32px; padding: 0; border: 1px solid var(--border); border-radius: 6px; background: var(--card-bg); color: var(--primary); font-size: 17px; }
+        .day-editor-toggle:hover, .day-editor-toggle:focus-visible { background: var(--primary-light); }
         .view-tabs { display: flex; gap: 8px; margin-bottom: 12px; }
         .view-tab-btn {
             flex: 1;
@@ -213,6 +217,10 @@
             font-weight: 700;
             flex-shrink: 0;
         }
+        .scene-actions { display: flex; align-items: center; gap: 5px; }
+        .scene-order-btn, .scene-delete-btn { min-width: 32px; height: 32px; padding: 0 7px; border-radius: 6px; }
+        .scene-order-btn { background: #f1f5f9; color: var(--text-main); }
+        .scene-delete-btn { background: #fee2e2; color: #991b1b; }
 
         .badges-top { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
         .badge {
@@ -226,6 +234,20 @@
         .badge.extra .extra-entry { display: inline-block; max-width: 100%; vertical-align: baseline; }
         .badge.extra .extra-role { overflow-wrap: anywhere; }
         .badge.extra .extra-count { display: inline-block; padding: 0 3px; border-radius: 4px; background: rgba(255,255,255,.8); color: #14532d; font-size: 1.05em; font-weight: 800; white-space: nowrap; }
+        .inline-scene-control { display: block; width: 100%; box-sizing: border-box; border: 1px solid rgba(100,116,139,.32); border-radius: 5px; padding: 7px 8px; color: inherit; background: rgba(255,255,255,.78); font: inherit; }
+        .scene-num-input { width: 82px; font-weight: 800; color: var(--primary); }
+        .scene-date-input { width: 86px; font-size: 12px; }
+        .inline-scene-label { display: block; margin: 2px 0 4px; font-size: 10px; font-weight: 700; text-transform: uppercase; opacity: .78; }
+        .scene-set-editor, .scene-synopsis-editor { margin-bottom: 8px; }
+        .badge.cast .inline-scene-control { margin-top: 4px; }
+        .badge.extra .inline-scene-control { min-height: 88px; resize: vertical; line-height: 1.45; }
+        .props-section-editor .props-label { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+        .props-section-editor .props-label button { padding: 5px 8px; color: #78350f; background: rgba(255,255,255,.72); border: 1px solid #f2cf77; border-radius: 5px; }
+        .props-section-editor .admin-prop-item { margin: 0; padding: 8px 0; border: 0; border-top: 1px solid rgba(180,83,9,.14); background: transparent; }
+        .props-section-editor .admin-prop-row { flex-wrap: wrap; gap: 6px; }
+        .props-section-editor .admin-prop-row .prop-text-input { flex: 1 1 100%; min-width: 0; background: rgba(255,255,255,.78); }
+        .props-section-editor .prop-status-input { min-width: 0 !important; background: rgba(255,255,255,.78); }
+        .props-section-editor .prop-note-inline { width: 100%; }
         .badge.date { background: var(--primary-light); color: var(--primary); border: 1px solid var(--border); white-space: nowrap; }
 
         .props-section {
@@ -536,10 +558,9 @@
     </div>
 
     <div class="admin-footer">
-        <button id="adminToggleBtn" class="admin-toggle-link" onclick="toggleAdmin()">🔒 Admin Mode</button>
+        <button id="adminToggleBtn" class="admin-toggle-link" onclick="toggleAdmin()">🗂 Backstage</button>
         <div id="hiddenAdminControls" class="hidden" style="margin-top: 10px; display: flex; flex-direction: column; gap: 8px;">
             <div style="display: flex; flex-wrap: wrap; gap: 6px; justify-content: center;">
-                <button onclick="addNewScene()" style="background: var(--primary); color:white;">➕ Aggiungi Scena</button>
                 <button onclick="exportData()">💾 Esporta backup</button>
                 <button onclick="importDataClick()">📂 Ripristina backup</button>
             </div>
@@ -673,6 +694,7 @@
     let dbScenes = [];
     let currentDay = "";
     let isAdmin = false;
+    let isEditorMode = false;
     let viewMode = "days";
     let searchQuery = "";
     let expandedScenes = new Set();
@@ -687,14 +709,14 @@
         btn.textContent = isSaving ? '💾 Salvataggio…' : isDirty ? '💾 Salva tutte le modifiche ●' : '💾 Salva tutte le modifiche';
         btn.classList.toggle('dirty', isDirty);
         const dock = document.getElementById('saveDock');
-        const showDock = isAdmin && (isDirty || isSaving || saveFailed);
+        const showDock = isEditorMode || isDirty || isSaving || saveFailed;
         dock.classList.toggle('hidden', !showDock);
         document.body.classList.toggle('save-dock-visible', showDock);
         dock.classList.toggle('has-changes', isDirty || saveFailed);
         document.getElementById('saveDockBtn').disabled = isSaving || !isDirty;
         document.getElementById('saveDockBtn').textContent = isSaving ? 'Salvataggio…' : '💾 Salva';
         document.getElementById('saveDockStatus').textContent = isSaving ? 'Salvataggio in corso…' : saveFailed
-            ? '⚠️ Da salvare' : '● Da salvare';
+            ? '⚠️ Da salvare' : isDirty ? '● Modifiche non salvate' : isEditorMode ? 'Editor attivo' : '● Da salvare';
     }
 
     function markDirty() {
@@ -818,6 +840,11 @@
         renderAppCore();
         autosizeAll();
     }
+    function renderAppPreservingScroll() {
+        const scrollPosition = { left: window.scrollX, top: window.scrollY };
+        renderApp();
+        requestAnimationFrame(() => window.scrollTo(scrollPosition));
+    }
     function renderAppCore() {
         if (!isAdmin) viewMode = 'days';
         document.getElementById('adminViewControls').classList.toggle('hidden', !isAdmin);
@@ -870,11 +897,14 @@
 
         let html = `
             <div class="day-header ${!searchQuery && currentDay === UNSCHEDULED_DAY ? 'unscheduled-banner' : ''}">
-                <div>
+                <div class="day-header-copy">
                     <h2>${headerTitle}</h2>
                     ${headerSubtitle ? `<div class="day-summary">${headerSubtitle}</div>` : ''}
                 </div>
-                ${isAdmin && !searchQuery ? `<button onclick="addNewScene()" style="background:var(--primary); color:white; font-size:12px; padding:6px 12px; flex-shrink:0;">➕ Aggiungi Scena Qui</button>` : ''}
+                <div class="day-header-controls">
+                    ${isEditorMode && !searchQuery ? `<button onclick="addNewScene()" style="background:var(--primary); color:white; font-size:12px; padding:6px 12px; flex-shrink:0;">➕ Aggiungi Scena Qui</button>` : ''}
+                    ${!isAdmin ? `<button type="button" class="day-editor-toggle" onclick="toggleEditorMode()" title="${isEditorMode ? 'Torna alla visualizzazione' : 'Apri editor'}" aria-label="${isEditorMode ? 'Torna alla visualizzazione' : 'Apri editor'}" aria-pressed="${isEditorMode}">${isEditorMode ? '×' : '✎'}</button>` : ''}
+                </div>
             </div>
         `;
 
@@ -943,8 +973,9 @@
             if (!match) return escapeHtml(entry);
             return `${escapeHtml(match[1])}<span class="extra-entry"><strong class="extra-count">${escapeHtml(match[2])}</strong> <span class="extra-role">${escapeHtml(match[3])}</span></span>`;
         }).join(' ');
+        const extrasEditorValue = renderExtras(s.extras || '').replace(/; /g, '\n');
         let publicPropsHTML = "";
-        if (propsList.length > 0) {
+        if (!isEditorMode && propsList.length > 0) {
             const itemsList = renderGroupedProps(propsList);
             publicPropsHTML = `
                 <div class="props-section">
@@ -956,13 +987,19 @@
 
         let adminPropsHTML = "";
         if (propsList.length > 0) {
-            adminPropsHTML = propsList.map((p, pIdx) => {
+            const editableProps = propsList.map((prop, propIndex) => ({ prop, propIndex }))
+                .sort((a, b) => {
+                    const aBackground = /^background\s*:/i.test(a.prop.text || '');
+                    const bBackground = /^background\s*:/i.test(b.prop.text || '');
+                    return Number(aBackground) - Number(bBackground) || a.propIndex - b.propIndex;
+                });
+            adminPropsHTML = editableProps.map(({ prop: p, propIndex: pIdx }) => {
                 const rSel = p.status === 'red' ? 'selected' : '';
                 const ySel = p.status === 'yellow' ? 'selected' : '';
                 const gSel = p.status === 'green' ? 'selected' : '';
                 const hasNote = p.note && p.note.trim() !== "";
                 const noteBtnClass = hasNote ? "note-symbol-btn has-note" : "note-symbol-btn";
-                const noteContainerStyle = hasNote ? "" : "display:none;";
+                const noteContainerStyle = "display:none;";
 
                 return `
                     <div class="admin-prop-item" data-prop-index="${pIdx}">
@@ -985,24 +1022,34 @@
         } else {
             adminPropsHTML = `<p style="font-size:12px; color:var(--text-muted); margin: 4px 0;">Nessun prop registrato.</p>`;
         }
+        if (isEditorMode) {
+            publicPropsHTML = `
+                <div class="props-section props-section-editor">
+                    <span class="props-label">📦 Props <button type="button" onclick="addProp(${s.id})">＋ Prop</button></span>
+                    <div class="props-list admin-props-container" data-id="${s.id}">${adminPropsHTML}</div>
+                </div>
+            `;
+        }
 
         const expanded = expandedScenes.has(s.id);
+        const editButton = isAdmin ? `<button type="button" class="edit-toggle-btn" onclick="toggleEditor(${s.id})" aria-expanded="${expanded}" title="Note interne e revisione">📝</button>` : '';
 
         return `
             <div class="scene-card ${isAdmin && SceneReview.isFlagged(s.adminNotes) ? 'needs-review' : ''}" data-id="${s.id}">
                 <div class="scene-top">
-                    <span class="scene-num">${escapeHtml(s.scena)}</span>
-                    <div style="display:flex; gap:6px; align-items:center;">
-                        ${showDateBadge ? `<span class="badge date">📅 ${escapeHtml(s.data)}</span>` : ''}
-                        ${isAdmin ? `<button type="button" class="edit-toggle-btn" onclick="toggleEditor(${s.id})">${expanded ? '✖️ Chiudi' : '✏️ Modifica'}</button>` : ''}
+                    ${isEditorMode ? `<input type="text" class="inline-scene-control scene-num-input input-scena" data-id="${s.id}" aria-label="Numero scena" value="${escapeHtml(s.scena || '')}">` : `<span class="scene-num">${escapeHtml(s.scena)}</span>`}
+                    <div class="scene-actions">
+                        ${isEditorMode ? `<input type="text" class="inline-scene-control scene-date-input input-data" data-id="${s.id}" aria-label="Data di ripresa" value="${escapeHtml(s.data || '')}">` : showDateBadge ? `<span class="badge date">📅 ${escapeHtml(s.data)}</span>` : ''}
+                        ${isEditorMode ? `<button type="button" class="scene-order-btn" onclick="moveScene(${s.id}, -1)" title="Sposta su" aria-label="Sposta ${escapeHtml(s.scena)} su">↑</button><button type="button" class="scene-order-btn" onclick="moveScene(${s.id}, 1)" title="Sposta giù" aria-label="Sposta ${escapeHtml(s.scena)} giù">↓</button><button type="button" class="scene-delete-btn" onclick="deleteScene(${s.id})" title="Elimina scena" aria-label="Elimina ${escapeHtml(s.scena)}">×</button>` : ''}
+                        ${editButton}
                     </div>
                 </div>
-                <div class="scene-set">${escapeHtml(s.set)}</div>
-                <div class="scene-synopsis">${escapeHtml(s.sinossi)}</div>
+                ${isEditorMode ? `<div class="scene-set scene-set-editor"><label class="inline-scene-label" for="set-${s.id}">Set</label><textarea id="set-${s.id}" class="inline-scene-control input-set autogrow single" data-id="${s.id}" rows="1">${escapeHtml(s.set || '')}</textarea></div>` : `<div class="scene-set">${escapeHtml(s.set)}</div>`}
+                ${isEditorMode ? `<div class="scene-synopsis scene-synopsis-editor"><label class="inline-scene-label" for="synopsis-${s.id}">Sinossi</label><textarea id="synopsis-${s.id}" class="inline-scene-control input-sinossi autogrow" data-id="${s.id}">${escapeHtml(s.sinossi || '')}</textarea></div>` : `<div class="scene-synopsis">${escapeHtml(s.sinossi)}</div>`}
 
                 <div class="badges-top">
-                    ${s.cast ? `<span class="badge cast">🎭 Cast: ${escapeHtml(s.cast)}</span>` : ''}
-                    ${s.extras ? `<span class="badge extra">👥 Extras: ${renderExtrasHTML(s.extras)}</span>` : ''}
+                    ${isEditorMode ? `<label class="badge cast"><span>🎭 Cast</span><input type="text" class="inline-scene-control input-cast" data-id="${s.id}" aria-label="Cast" value="${escapeHtml(s.cast || '')}"></label>` : s.cast ? `<span class="badge cast">🎭 Cast: ${escapeHtml(s.cast)}</span>` : ''}
+                    ${isEditorMode ? `<label class="badge extra"><span>👥 Extras</span><textarea class="inline-scene-control input-extras autogrow" data-id="${s.id}" data-original-value="${escapeHtml(extrasEditorValue)}" aria-label="Extras">${escapeHtml(extrasEditorValue)}</textarea></label>` : s.extras ? `<span class="badge extra">👥 Extras: ${renderExtrasHTML(s.extras)}</span>` : ''}
                 </div>
 
                 ${publicPropsHTML}
@@ -1015,45 +1062,7 @@
                 ` : ''}
 
                 <div class="edit-container ${isAdmin && expanded ? '' : 'hidden'}">
-                    <div class="edit-row wrap">
-                        <div class="edit-group" style="flex: 0 0 75px;">
-                            <label>Scena</label>
-                            <input type="text" class="input-scena" data-id="${s.id}" value="${escapeHtml(s.scena || '')}">
-                        </div>
-                        <div class="edit-group" style="flex: 0 0 85px;">
-                            <label>Data</label>
-                            <input type="text" class="input-data" data-id="${s.id}" value="${escapeHtml(s.data || '')}" placeholder="Es: 19 Ott">
-                        </div>
-                        <div class="edit-group" style="flex: 1 1 100%; order: 3;">
-                            <label>Set</label>
-                            <textarea class="input-set autogrow single" rows="1" data-id="${s.id}">${escapeHtml(s.set || '')}</textarea>
-                        </div>
-                    </div>
-                    <div class="edit-group full">
-                        <label>Sinossi</label>
-                        <textarea class="input-sinossi autogrow" data-id="${s.id}">${escapeHtml(s.sinossi || '')}</textarea>
-                    </div>
-                    <div class="edit-row wrap">
-                        <div class="edit-group" style="min-width: 220px;">
-                            <label>🎭 Cast</label>
-                            <textarea class="input-cast autogrow single" rows="1" data-id="${s.id}" placeholder="Attori...">${escapeHtml(s.cast || '')}</textarea>
-                        </div>
-                        <div class="edit-group" style="min-width: 220px;">
-                            <label>👥 Extras</label>
-                            <textarea class="input-extras autogrow single" rows="1" data-id="${s.id}" placeholder="Extras...">${escapeHtml(s.extras || '')}</textarea>
-                        </div>
-                    </div>
-
-                    <div class="edit-group full props-manager">
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                            <label style="margin:0;">📦 Gestione Singoli Props</label>
-                            <button type="button" onclick="addProp(${s.id})" style="background:var(--primary); color:white; font-size:11px; padding:4px 8px;">➕ Aggiungi Prop</button>
-                        </div>
-                        <div class="admin-props-container" data-id="${s.id}">
-                            ${adminPropsHTML}
-                        </div>
-                    </div>
-
+                    <div class="backstage-fields">
                     <div class="edit-row wrap" style="margin-top: 4px; align-items: flex-end;">
                         <div class="edit-group full">
                             <div class="review-note-heading">
@@ -1062,11 +1071,7 @@
                             </div>
                             <textarea id="adminnotes-${s.id}" class="input-adminnotes autogrow single" rows="1" data-id="${s.id}" placeholder="Note generali di scena...">${escapeHtml(SceneReview.getNote(s.adminNotes))}</textarea>
                         </div>
-                        <div style="display: flex; gap: 6px; margin-bottom: 2px; flex: 1 1 100%; justify-content: flex-end;">
-                            <button onclick="moveScene(${s.id}, -1)" title="Sposta su" style="background:#e2e8f0; font-weight:bold; padding:8px 10px;">⬆️</button>
-                            <button onclick="moveScene(${s.id}, 1)" title="Sposta giù" style="background:#e2e8f0; font-weight:bold; padding:8px 10px;">⬇️</button>
-                            <button onclick="deleteScene(${s.id})" style="background:#fee2e2; color:#991b1b; border:none; border-radius:6px; padding:8px 12px; font-weight:bold;" title="Elimina scena">🗑️</button>
-                        </div>
+                    </div>
                     </div>
                 </div>
             </div>
@@ -1160,8 +1165,8 @@
         searchQuery = "";
         const input = document.getElementById('searchInput');
         if (input) input.value = "";
-        if (isAdmin) expandedScenes.add(sceneId);
-        renderApp();
+        if (isAdmin || isEditorMode) expandedScenes.add(sceneId);
+        renderAppPreservingScroll();
         setTimeout(() => {
             const el = document.querySelector(`.scene-card[data-id="${sceneId}"]`);
             if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -1172,41 +1177,71 @@
         if (isSaving) return;
         syncInputsToDb();
         isAdmin = !isAdmin;
+        isEditorMode = false;
         const btn = document.getElementById('adminToggleBtn');
         const controls = document.getElementById('hiddenAdminControls');
         const saveGlobal = document.getElementById('saveGlobalBtn');
 
         if (isAdmin) {
-            btn.innerText = "🔓 Admin Mode Attiva";
+            btn.innerText = "🗂 Backstage attivo";
             btn.style.color = "var(--primary)";
             controls.classList.remove('hidden');
             saveGlobal.classList.remove('hidden');
         } else {
-            btn.innerText = "🔒 Admin Mode";
+            btn.innerText = "🗂 Backstage";
             btn.style.color = "var(--text-muted)";
             controls.classList.add('hidden');
             saveGlobal.classList.add('hidden');
         }
         updateSaveButton();
-        renderApp();
+        renderAppPreservingScroll();
+    }
+
+    function toggleEditorMode() {
+        if (isSaving) return;
+        syncInputsToDb();
+        if (isEditorMode) {
+            exitEditorMode();
+            return;
+        }
+        isAdmin = false;
+        viewMode = 'days';
+        document.getElementById('adminViewControls').classList.add('hidden');
+        document.getElementById('hiddenAdminControls').classList.add('hidden');
+        document.getElementById('saveGlobalBtn').classList.add('hidden');
+        document.getElementById('adminToggleBtn').innerText = '🗂 Backstage';
+        document.getElementById('adminToggleBtn').style.color = 'var(--text-muted)';
+        isEditorMode = true;
+        updateSaveButton();
+        renderAppPreservingScroll();
     }
 
     function toggleEditor(sceneId) {
+        if (!isAdmin && !isEditorMode) return;
         syncInputsToDb();
         if (expandedScenes.has(sceneId)) {
             expandedScenes.delete(sceneId);
         } else {
             expandedScenes.add(sceneId);
         }
-        renderApp();
+        updateSaveButton();
+        renderAppPreservingScroll();
+    }
+
+    function exitEditorMode() {
+        if (isSaving) return;
+        syncInputsToDb();
+        isEditorMode = false;
+        expandedScenes.clear();
+        updateSaveButton();
+        renderAppPreservingScroll();
     }
 
     function togglePropNote(sceneId, propIndex) {
         syncInputsToDb();
         const sceneCard = document.querySelector(`.scene-card[data-id="${sceneId}"]`);
         if (sceneCard) {
-            const propItems = sceneCard.querySelectorAll('.admin-prop-item');
-            const targetItem = propItems[propIndex];
+            const targetItem = sceneCard.querySelector(`.admin-prop-item[data-prop-index="${propIndex}"]`);
             if (targetItem) {
                 const noteInline = targetItem.querySelector('.prop-note-inline');
                 const noteBtn = targetItem.querySelector('.note-symbol-btn');
@@ -1242,7 +1277,7 @@
         });
         expandedScenes.add(newId);
         markDirty();
-        renderApp();
+        renderAppPreservingScroll();
     }
 
     function addProp(sceneId) {
@@ -1251,7 +1286,7 @@
         if (scene) {
             scene.props.push({ text: "", status: "red", note: "" });
             markDirty();
-            renderApp();
+            renderAppPreservingScroll();
         }
     }
 
@@ -1261,7 +1296,7 @@
         if (scene) {
             scene.props.splice(propIndex, 1);
             markDirty();
-            renderApp();
+            renderAppPreservingScroll();
         }
     }
 
@@ -1270,7 +1305,7 @@
             dbScenes = dbScenes.filter(s => s.id !== id);
             expandedScenes.delete(id);
             markDirty();
-            renderApp();
+            renderAppPreservingScroll();
         }
     }
 
@@ -1289,7 +1324,7 @@
             dbScenes[globalIndexB] = temp;
 
             markDirty();
-            renderApp();
+            renderAppPreservingScroll();
         }
     }
 
@@ -1308,12 +1343,13 @@
             if (setInput) scene.set = setInput.value;
             if (sinInput) scene.sinossi = sinInput.value;
             if (castInput) scene.cast = castInput.value;
-            if (extrasInput) scene.extras = extrasInput.value;
+            if (extrasInput && extrasInput.value !== extrasInput.dataset.originalValue) scene.extras = extrasInput.value;
             if (adminNotesInput) scene.adminNotes = SceneReview.setNote(scene.adminNotes, adminNotesInput.value);
 
             const propsContainer = document.querySelector(`.admin-props-container[data-id="${scene.id}"]`);
             if (propsContainer) {
-                const propItems = propsContainer.querySelectorAll('.admin-prop-item');
+                const propItems = [...propsContainer.querySelectorAll('.admin-prop-item')]
+                    .sort((a, b) => Number(a.dataset.propIndex) - Number(b.dataset.propIndex));
                 let updatedProps = [];
                 propItems.forEach(item => {
                     const textVal = item.querySelector('.prop-text-input').value;
@@ -1329,7 +1365,7 @@
     }
 
     async function saveChanges() {
-        if (!isAdmin || isSaving || document.querySelector('dialog[open]')) return;
+        if ((!isAdmin && !isEditorMode && !isDirty) || isSaving || document.querySelector('dialog[open]')) return;
         syncInputsToDb();
         const scrollPosition = { left: window.scrollX, top: window.scrollY };
         const expandedPositions = dbScenes.map((scene, index) => expandedScenes.has(scene.id) ? index : -1).filter(index => index >= 0);
@@ -1398,7 +1434,7 @@
     }
 
     document.addEventListener('keydown', event => {
-        if (event.key === 'Enter' && (event.ctrlKey || event.metaKey) && !event.isComposing && !event.repeat && isAdmin && !document.querySelector('dialog[open]')) {
+        if (event.key === 'Enter' && (event.ctrlKey || event.metaKey) && !event.isComposing && !event.repeat && (isAdmin || isEditorMode) && !document.querySelector('dialog[open]')) {
             event.preventDefault();
             if (isDirty) saveChanges();
         }
@@ -1470,7 +1506,7 @@
         if (e.key === 'Enter' && e.target.classList && e.target.classList.contains('single')) e.preventDefault();
     });
     function onEditorChange(e) {
-        if (isAdmin && e.target.closest && e.target.closest('.edit-container')) markDirty();
+        if ((isAdmin || isEditorMode) && e.target.closest && e.target.closest('.scene-card') && e.target.matches('input, textarea, select')) markDirty();
     }
     document.getElementById('mainContent').addEventListener('input', onEditorChange);
     document.getElementById('mainContent').addEventListener('change', onEditorChange);
