@@ -297,10 +297,15 @@
             word-break: break-word;
         }
 
-        .prop-group + .prop-group { margin-top: 10px; }
-        .prop-group-name { display: block; margin-bottom: 5px; font-weight: 700; }
-        .prop-group-items { margin: 0; padding-left: 20px; }
-        .prop-group-items li + li { margin-top: 4px; }
+        .prop-group + .prop-group { margin-top: 6px; padding-top: 8px; border-top: 1px solid rgba(161,85,17,.13); }
+        .prop-group-name { display: block; margin-bottom: 6px; font-size: 16px; font-weight: 700; }
+        .prop-group-items { display: flex; flex-wrap: wrap; gap: 5px; list-style: none; margin: 0; padding: 0; }
+        .prop-group-items li {
+            max-width: 100%; min-width: 0; padding: 3px 7px;
+            border: 1px solid #e9c770; border-radius: 5px;
+            background: rgba(255,255,255,.55); font-size: 14px;
+            overflow-wrap: anywhere;
+        }
 
         .admin-notes-box {
             background: #f1f5f9;
@@ -538,6 +543,8 @@
         body.dark-mode .badge.date { background: #1e3a5f; }
         body.dark-mode .props-section { background: #2a2210; border-color: #78350f; }
         body.dark-mode .prop-item-public { color: #fbbf24; }
+        body.dark-mode .prop-group + .prop-group { border-top-color: rgba(251,191,36,.2); }
+        body.dark-mode .prop-group-items li { background: rgba(255,255,255,.06); border-color: #876820; }
         body.dark-mode .day-btn.active,
         body.dark-mode .view-tab-btn.active { background: #2563eb; border-color: #2563eb; color: #fff; }
         body.dark-mode .props-manager { background: #1e293b; }
