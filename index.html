@@ -942,7 +942,7 @@
             const match = entry.match(/^(.*?)(\d+\s*x)\s+(.+)$/i);
             if (!match) return escapeHtml(entry);
             return `${escapeHtml(match[1])}<span class="extra-entry"><strong class="extra-count">${escapeHtml(match[2])}</strong> <span class="extra-role">${escapeHtml(match[3])}</span></span>`;
-        }).join('; ');
+        }).join(' ');
         let publicPropsHTML = "";
         if (propsList.length > 0) {
             const itemsList = renderGroupedProps(propsList);
