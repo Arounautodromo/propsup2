@@ -231,6 +231,9 @@
         }
         .badge.cast { background: var(--cast-light); color: var(--cast-color); border: 1px solid #bfdbfe; font-weight: 600; }
         .badge.extra { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
+        .badge.scene-note-toggle { width: 100%; text-align: left; background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
+        .badge.scene-note-toggle.has-note { background: #eff6ff; color: #1e40af; border-color: #bfdbfe; }
+        .scene-note-input { min-height: 64px; margin-top: 5px; resize: vertical; }
         .badge.extra .extra-entry { display: inline-block; max-width: 100%; vertical-align: baseline; }
         .badge.extra .extra-role { overflow-wrap: anywhere; }
         .badge.extra .extra-count { display: inline-block; padding: 0 1px; border-radius: 4px; background: rgba(255,255,255,.8); color: #14532d; font-size: 1.05em; font-weight: 800; white-space: nowrap; }
@@ -717,6 +720,7 @@
     let viewMode = "days";
     let searchQuery = "";
     let expandedScenes = new Set();
+    let expandedSceneNotes = new Set();
     let dataVersion = null;
     let isDirty = false;
     let isSaving = false;
@@ -1074,6 +1078,8 @@
                     ${isEditorMode ? `<label class="badge extra"><span>👥 Extras</span><textarea class="inline-scene-control input-extras autogrow" data-id="${s.id}" data-original-value="${escapeHtml(extrasEditorValue)}" aria-label="Extras">${escapeHtml(extrasEditorValue)}</textarea></label>` : s.extras ? `<span class="badge extra">👥 Extras: ${renderExtrasHTML(s.extras)}</span>` : ''}
                 </div>
 
+                ${isEditorMode ? `<div class="scene-note-field"><button type="button" class="badge scene-note-toggle ${SceneReview.getNote(s.adminNotes).trim() ? 'has-note' : ''}" onclick="toggleSceneNote(${s.id})" aria-expanded="${expandedSceneNotes.has(s.id)}">${SceneReview.getNote(s.adminNotes).trim() ? '📝 Nota scena' : '＋ Nota scena'}</button>${expandedSceneNotes.has(s.id) ? `<textarea class="inline-scene-control input-adminnotes scene-note-input autogrow" data-id="${s.id}" aria-label="Nota generale della scena" placeholder="Note per tutta la scena...">${escapeHtml(SceneReview.getNote(s.adminNotes))}</textarea>` : ''}</div>` : ''}
+
                 ${publicPropsHTML}
 
                 ${isAdmin && SceneReview.getNote(s.adminNotes) ? `
@@ -1250,11 +1256,20 @@
         renderAppPreservingScroll();
     }
 
+    function toggleSceneNote(sceneId) {
+        if (!isEditorMode || isSaving) return;
+        syncInputsToDb();
+        if (expandedSceneNotes.has(sceneId)) expandedSceneNotes.delete(sceneId);
+        else expandedSceneNotes.add(sceneId);
+        renderAppPreservingScroll();
+    }
+
     function exitEditorMode() {
         if (isSaving) return;
         syncInputsToDb();
         isEditorMode = false;
         expandedScenes.clear();
+        expandedSceneNotes.clear();
         updateSaveButton();
         renderAppPreservingScroll();
     }
@@ -1392,6 +1407,7 @@
         syncInputsToDb();
         const scrollPosition = { left: window.scrollX, top: window.scrollY };
         const expandedPositions = dbScenes.map((scene, index) => expandedScenes.has(scene.id) ? index : -1).filter(index => index >= 0);
+        const expandedNotePositions = dbScenes.map((scene, index) => expandedSceneNotes.has(scene.id) ? index : -1).filter(index => index >= 0);
         const focused = document.activeElement;
         const card = focused.closest('.scene-card');
         const scenePosition = card ? dbScenes.findIndex(scene => String(scene.id) === card.dataset.id) : -1;
@@ -1433,6 +1449,7 @@
             applySaved(saved.scenes, saved.version);
             lastSavedSnapshot = isUndoingSave ? null : previousScenes;
             expandedScenes = new Set(expandedPositions.map(index => dbScenes[index]?.id).filter(id => id !== undefined));
+            expandedSceneNotes = new Set(expandedNotePositions.map(index => dbScenes[index]?.id).filter(id => id !== undefined));
             savedSuccessfully = true;
             showToast('✅ Modifiche salvate e pubblicate.');
         } catch (e) {
@@ -1493,6 +1510,7 @@
         dataVersion = version;
         dbScenes = saved.map(s => ({ ...s, props: parseProps(s.props) }));
         expandedScenes = new Set();
+        expandedSceneNotes = new Set();
         const availableDays = getAvailableDays();
         if (availableDays.length > 0 && !availableDays.includes(currentDay)) currentDay = availableDays[0];
         clearDirty();
