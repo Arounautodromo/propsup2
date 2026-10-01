@@ -41,5 +41,12 @@
     };
     const getPhotos = stored => splitStored(stored).photos;
     const setPhotos = (stored, photos) => pack(splitStored(stored).content, photos);
-    return { isFlagged, getNote, setNote, toggle, getPhotos, setPhotos };
+    const normalizeMultiplesText = value => String(value ?? '')
+        .replace(/\b(?:x\s*)?repeats?\b/gi, 'multiples')
+        .replace(/\bmultiples\b/gi, 'multiples');
+    const hasMultiples = prop => {
+        if (typeof prop?.multiples === 'boolean') return prop.multiples;
+        return /\b(?:x\s*)?repeats?\b|\bmultiples\b/i.test(`${prop?.text || ''} ${prop?.note || ''}`);
+    };
+    return { isFlagged, getNote, setNote, toggle, getPhotos, setPhotos, normalizeMultiplesText, hasMultiples };
 });
