@@ -735,10 +735,12 @@
         if (Array.isArray(propsInput)) {
             return propsInput.map(p => {
                 if (typeof p === 'string') return { text: p, status: "green", note: "", multiples: false };
-                const text = SceneReview.normalizeMultiplesText(p.text || '');
-                const note = SceneReview.normalizeMultiplesText(p.note || '');
-                return { ...p, text, status: p.status || "green", note,
-                    multiples: SceneReview.hasMultiples({ ...p, text, note }) };
+                const normalizedText = SceneReview.normalizeMultiplesText(p.text || '');
+                const normalizedNote = SceneReview.normalizeMultiplesText(p.note || '');
+                const multiples = SceneReview.hasMultiples({ ...p, text: normalizedText, note: normalizedNote });
+                const text = SceneReview.removeMultiplesText(normalizedText);
+                const note = SceneReview.removeMultiplesText(normalizedNote);
+                return { ...p, text, status: p.status || "green", note, multiples };
             });
         }
         return String(propsInput).split(/,|\n/).map(p => p.trim()).filter(p => p.length > 0).map(p => {
@@ -1119,7 +1121,7 @@
                                 <option value="yellow" ${ySel}>🟡 Comprato</option>
                                 <option value="green" ${gSel}>🟢 Sul camion</option>
                             </select>
-                            <label class="prop-multiples-toggle" title="Da ripetere a ogni ciak"><input type="checkbox" class="prop-multiples-input" ${mChecked} aria-label="Multiples"><span>↻ Multiples</span></label>
+                            <label class="prop-multiples-toggle" title="Da ripetere a ogni ciak"><input type="checkbox" class="prop-multiples-input" ${mChecked} aria-label="Multiples"><span aria-hidden="true">↻</span></label>
                             <button type="button" class="${noteBtnClass}" onclick="togglePropNote(${s.id}, ${pIdx})" title="Note prop">📝</button>
                             <button type="button" onclick="removeProp(${s.id}, ${pIdx})" style="background:#fee2e2; color:#991b1b; border:none; border-radius:6px; padding:7px 10px; font-weight:bold;" title="Rimuovi prop">✕</button>
                         </div>

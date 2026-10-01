@@ -57,6 +57,9 @@ test('repeat notes normalize to multiples and explicit checkbox state takes prec
     }
     assert.equal(review.normalizeMultiplesText('Keep this detail / x repeats / check with makeup'),
         'Keep this detail / multiples / check with makeup');
+    assert.equal(review.removeMultiplesText('PERSONALS (same as sc. 42 multiples)'), 'PERSONALS (same as sc. 42)');
+    assert.equal(review.removeMultiplesText('multiples / check with makeup'), 'check with makeup');
+    assert.equal(review.removeMultiplesText('multiples'), '');
     assert.equal(review.hasMultiples({ multiples: false, note: 'multiples' }), false);
     assert.equal(review.hasMultiples({ multiples: true, note: '' }), true);
 });
