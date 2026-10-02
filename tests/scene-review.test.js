@@ -49,6 +49,21 @@ test('photo metadata stays hidden in scene notes and survives note/flag edits an
     assert.deepEqual(review.getPhotos(cleared), []);
 });
 
+test('repeat notes normalize to multiples and explicit checkbox state takes precedence', () => {
+    for (const note of ['x repeats', 'X Repeats ??', 'Liquid x repeat / check intollerance', 'Multiples']) {
+        assert.equal(review.hasMultiples({ note }), true);
+        assert.match(review.normalizeMultiplesText(note), /multiples/);
+        assert.doesNotMatch(review.normalizeMultiplesText(note), /repeats?/i);
+    }
+    assert.equal(review.normalizeMultiplesText('Keep this detail / x repeats / check with makeup'),
+        'Keep this detail / multiples / check with makeup');
+    assert.equal(review.removeMultiplesText('PERSONALS (same as sc. 42 multiples)'), 'PERSONALS (same as sc. 42)');
+    assert.equal(review.removeMultiplesText('multiples / check with makeup'), 'check with makeup');
+    assert.equal(review.removeMultiplesText('multiples'), '');
+    assert.equal(review.hasMultiples({ multiples: false, note: 'multiples' }), false);
+    assert.equal(review.hasMultiples({ multiples: true, note: '' }), true);
+});
+
 test('JSON backup and schedule date/number changes preserve flags, notes and props', () => {
     const original = [{id: 1, scena: 'sc.1', data: '16 Ott', adminNotes: review.toggle('Check bouquet'),
         props: [{text: 'Bouquet', status: 'yellow', note: 'Costumes'}]},

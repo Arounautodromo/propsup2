@@ -8,7 +8,7 @@ const SceneReview = require('../scene-review.js');
 // Exercise the actual inline functions without starting the app or accessing Supabase.
 const html = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
 const searchSource = html.slice(html.indexOf('    function matchesSearch('), html.indexOf('    function countPendingProps('));
-const context = vm.createContext({ isAdmin: false, SceneReview, PropRepeat: require('../prop-repeat.js') });
+const context = vm.createContext({ isAdmin: false, SceneReview });
 vm.runInContext(searchSource, context);
 const search = (scenes, q) => Array.from(context.searchScenes(scenes, q));
 const labels = scenes => scenes.map(s => s.scena);
