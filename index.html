@@ -560,6 +560,7 @@
         body.dark-mode #searchInput { background: #1e293b; color: var(--text-main); border-color: #334155; }
     </style>
     <link rel="stylesheet" href="schedule-import.css">
+    <link rel="stylesheet" href="weekly-view.css">
 </head>
 <body>
 
@@ -589,6 +590,8 @@
     </div>
 
     <div class="admin-footer">
+        <button type="button" class="admin-toggle-link" onclick="openWeeklyView()">📅 Settimana</button>
+        <button type="button" class="admin-toggle-link" onclick="openWeeklyPDF()">📄 PDF settimanale</button>
         <button id="adminToggleBtn" class="admin-toggle-link" onclick="toggleAdmin()">🗂 Backstage</button>
         <div id="hiddenAdminControls" class="hidden" style="margin-top: 10px; display: flex; flex-direction: column; gap: 8px;">
             <div style="display: flex; flex-wrap: wrap; gap: 6px; justify-content: center;">
@@ -601,6 +604,12 @@
     </div>
 </div>
 
+<dialog id="weeklyPdfDialog" aria-labelledby="weeklyPdfTitle">
+    <h2 id="weeklyPdfTitle">📄 PDF settimanale</h2>
+    <label for="weeklyPdfWeek">Settimana da esportare</label><select id="weeklyPdfWeek"></select>
+    <p id="weeklyPdfStatus" role="status"></p>
+    <div class="weekly-pdf-actions"><button type="button" onclick="document.getElementById('weeklyPdfDialog').close()">Chiudi</button><button type="button" id="weeklyPdfPrint" onclick="printWeeklyPDF()">Stampa / Salva PDF</button></div>
+</dialog>
 <div id="toast" class="toast"></div>
 <dialog id="scenePhotoViewer" class="scene-photo-viewer" aria-label="Foto della scena">
     <img id="scenePhotoViewerImage" alt="">
@@ -676,6 +685,7 @@
     <p class="schedule-hint">Alla conferma scarichi un backup JSON completo e salvi il piano sul sito. Per recuperarlo usa «Ripristina backup» in Admin.</p>
 </dialog>
 
+<script src="weekly-schedule.js"></script>
 <script src="config.js"></script>
 <script src="scene-review.js"></script>
 <script>
@@ -932,7 +942,10 @@
         requestAnimationFrame(() => window.scrollTo(scrollPosition));
     }
     function renderAppCore() {
-        if (!isAdmin) viewMode = 'days';
+        if (!isAdmin && viewMode !== 'weekly') viewMode = 'days';
+        document.querySelector('.container').classList.toggle('weekly-active', viewMode === 'weekly');
+        document.getElementById('daysScrollWrapper').classList.toggle('hidden', viewMode === 'weekly');
+        document.querySelector('.search-wrapper').classList.toggle('hidden', viewMode === 'weekly');
         document.getElementById('adminViewControls').classList.toggle('hidden', !isAdmin);
         document.querySelectorAll('.view-tab-btn').forEach(btn => {
             const active = btn.dataset.view === viewMode;
@@ -960,7 +973,7 @@
 
         document.getElementById('mainContent').innerHTML = viewMode === 'shopping'
             ? renderShoppingListHTML()
-            : viewMode === 'review' ? renderReviewScenesHTML() : renderDaysHTML();
+            : viewMode === 'review' ? renderReviewScenesHTML() : viewMode === 'weekly' ? renderWeeklyHTML() : renderDaysHTML();
     }
 
     function renderDaysHTML() {
@@ -1780,6 +1793,7 @@
     applyStoredTheme();
     loadData();
 </script>
+<script src="weekly-view.js"></script>
 <script src="schedule-import.js"></script>
 <script src="schedule-import-ui.js"></script>
 
