@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const path = require('node:path');
 const html = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
-const context = vm.createContext({ escapeHtml: value => String(value).replace(/</g, '&lt;') });
+const context = vm.createContext({ PropRepeat: require('../prop-repeat.js'), escapeHtml: value => String(value).replace(/</g, '&lt;') });
 vm.runInContext(html.slice(html.indexOf('    const PROP_CAST_ORDER'), html.indexOf('    function renderSceneCard(')), context);
 const rank = context.propCharacterRank;
 const prop = text => ({text, status:'yellow', note:'Keep note'});

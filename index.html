@@ -307,6 +307,15 @@
             overflow-wrap: anywhere;
         }
 
+        .prop-repeat-icon {
+            display: inline-block; margin: 0 0 0 3px; padding: 0 2px;
+            min-width: 20px; border: 0; border-radius: 3px; background: transparent;
+            color: inherit; font-size: 17px; line-height: 1; vertical-align: baseline;
+        }
+        .prop-repeat-icon:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+        .prop-repeat-label { display: flex; align-items: center; gap: 5px; width: fit-content; margin-top: 6px; font-size: 12px; color: var(--text-main); cursor: pointer; }
+        .prop-repeat-input { width: auto; margin: 0; accent-color: #b45309; }
+
         .admin-notes-box {
             background: #f1f5f9;
             border-left: 3px solid var(--primary);
@@ -675,6 +684,7 @@
 
 <script src="config.js"></script>
 <script src="scene-review.js"></script>
+<script src="prop-repeat.js"></script>
 <script>
     async function rpc(fn, args) {
         const headers = { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY };
@@ -845,7 +855,7 @@
         if (isAdmin) hay.push(SceneReview.getNote(s.adminNotes));
         (s.props || []).forEach(p => {
             hay.push(p.text);
-            if (isAdmin) hay.push(p.note);
+            if (isAdmin) hay.push(PropRepeat.getNote(p.note));
         });
         return hay.join(' \n ').toLowerCase().includes(q);
     }
@@ -1047,14 +1057,14 @@
             const name = hasCharacter ? text.slice(separator + 1).trim() : text;
             const key = character.toLocaleLowerCase().replace(/\s*,\s*/g, ',').replace(/\s+/g, ' ');
             if (!groups.has(key)) groups.set(key, { character, items: [] });
-            groups.get(key).items.push(name);
+            groups.get(key).items.push({ name, repeated: PropRepeat.isRepeated(p.note) });
         });
         const orderedGroups = [...groups.values()]
             .sort((a, b) => propCharacterRank(a.character) - propCharacterRank(b.character));
         return orderedGroups.map(group => `
             <div class="prop-group prop-item-public">
                 ${group.character ? `<strong class="prop-group-name">${escapeHtml(formatCharacter(group.character))}</strong>` : ''}
-                <ul class="prop-group-items">${group.items.map(name => `<li>${escapeHtml(name)}</li>`).join('')}</ul>
+                <ul class="prop-group-items">${group.items.map(item => `<li>${escapeHtml(item.name)}${item.repeated ? `<button type="button" class="prop-repeat-icon" title="A ripetere — più copie per i ciak" aria-label="A ripetere — più copie per i ciak: ${escapeHtml(item.name)}" onclick="showToast('↻ A ripetere — più copie per i ciak')">↻</button>` : ''}</li>`).join('')}</ul>
             </div>
         `).join('');
     }
@@ -1099,7 +1109,7 @@
                 const rSel = p.status === 'red' ? 'selected' : '';
                 const ySel = p.status === 'yellow' ? 'selected' : '';
                 const gSel = p.status === 'green' ? 'selected' : '';
-                const hasNote = p.note && p.note.trim() !== "";
+                const hasNote = PropRepeat.getNote(p.note).trim() !== "";
                 const noteBtnClass = hasNote ? "note-symbol-btn has-note" : "note-symbol-btn";
                 const noteContainerStyle = "display:none;";
 
@@ -1115,8 +1125,9 @@
                             <button type="button" class="${noteBtnClass}" onclick="togglePropNote(${s.id}, ${pIdx})" title="Note prop">📝</button>
                             <button type="button" onclick="removeProp(${s.id}, ${pIdx})" style="background:#fee2e2; color:#991b1b; border:none; border-radius:6px; padding:7px 10px; font-weight:bold;" title="Rimuovi prop">✕</button>
                         </div>
+                        <label class="prop-repeat-label"><input type="checkbox" class="prop-repeat-input" ${PropRepeat.isRepeated(p.note) ? 'checked' : ''}> ↻ A ripetere</label>
                         <div class="prop-note-inline" style="${noteContainerStyle}">
-                            <textarea class="prop-note-input autogrow" placeholder="Nota specifica per questo prop..." style="font-size: 13px;">${escapeHtml(p.note || '')}</textarea>
+                            <textarea class="prop-note-input autogrow" placeholder="Nota specifica per questo prop..." style="font-size: 13px;">${escapeHtml(PropRepeat.getNote(p.note))}</textarea>
                         </div>
                     </div>
                 `;
@@ -1221,7 +1232,7 @@
         dbScenes.forEach(s => {
             (s.props || []).forEach(p => {
                 if (p.status === 'red' || p.status === 'yellow') {
-                    items.push({ sceneId: s.id, day: s.data, scena: s.scena, set: s.set, text: p.text, status: p.status, note: p.note });
+                    items.push({ sceneId: s.id, day: s.data, scena: s.scena, set: s.set, text: p.text, status: p.status, note: PropRepeat.getNote(p.note) });
                 }
             });
         });
@@ -1588,7 +1599,7 @@
                     const statusVal = item.querySelector('.prop-status-input').value;
                     const noteVal = item.querySelector('.prop-note-input').value;
                     if (textVal.trim() !== "") {
-                        updatedProps.push({ text: textVal, status: statusVal, note: noteVal });
+                        updatedProps.push({ text: textVal, status: statusVal, note: PropRepeat.setRepeated(noteVal, item.querySelector('.prop-repeat-input').checked) });
                     }
                 });
                 scene.props = updatedProps;
